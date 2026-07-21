@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X Desktop Video Auto Next
 // @namespace    http://tampermonkey.net/
-// @version      1.3.0
+// @version      1.3.1
 // @description  On X/Twitter desktop, when a video ends, play the next timeline video instead of looping
 // @author       You
 // @match        https://x.com/*
@@ -9,7 +9,7 @@
 // @updateURL    https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/main/x-desktop-video-auto-next.user.js
 // @downloadURL  https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/main/x-desktop-video-auto-next.user.js
 // @run-at       document-idle
-// @grant        unsafeWindow
+// @grant        none
 // ==/UserScript==
 
 (function () {
@@ -27,8 +27,6 @@
   var lastAdvanceAt = 0;
   var lastAdvanceFromSrc = '';
 
-  var pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
-
   function log() {
     if (!DEBUG) return;
     var args = ['[X-AutoNext]'].concat([].slice.call(arguments));
@@ -40,6 +38,10 @@
     advanceUnlockTimer = window.setTimeout(function () {
       advancing = false;
     }, ADVANCE_COOLDOWN_MS);
+  }
+
+  function isVideoEl(node) {
+    return !!(node && node.nodeType === 1 && String(node.tagName).toUpperCase() === 'VIDEO');
   }
 
   function findNextVideoButton() {
@@ -64,8 +66,7 @@
   }
 
   function isUsableVideo(video) {
-    if (!(video instanceof HTMLVideoElement)) return false;
-    if (!video.isConnected) return false;
+    if (!isVideoEl(video) || !video.isConnected) return false;
     var rect = video.getBoundingClientRect();
     if (rect.width < 120 || rect.height < 120) return false;
     return true;
@@ -121,15 +122,12 @@
   function playVideo(video) {
     disableLoop(video);
     var box = containerFor(video);
-
-    // Prefer a real click so X's player takes over (works better than video.play()).
     hardClick(video);
     var playBtn =
       box.querySelector('[data-testid="play"]') ||
       box.querySelector('[aria-label="Play"]') ||
       box.querySelector('[aria-label="Play video"]');
     if (playBtn) hardClick(playBtn);
-
     try {
       var p = video.play();
       if (p && typeof p.catch === 'function') p.catch(function () {});
@@ -160,7 +158,6 @@
       box.scrollIntoView(true);
     }
 
-    // Give the virtualized timeline a moment to settle, then poke play twice.
     window.setTimeout(function () {
       playVideo(next);
       lastActiveVideo = next;
@@ -200,15 +197,14 @@
           fromIdx >= 0 && fromIdx < again.length - 1 ? again[fromIdx + 1] : null;
         if (!candidate) {
           for (var j = 0; j < again.length; j++) {
-            if (again[j] !== fromVideo) {
-              var t = again[j].getBoundingClientRect().top + window.scrollY;
-              var ft = fromVideo
-                ? fromVideo.getBoundingClientRect().top + window.scrollY
-                : 0;
-              if (t > ft + 80) {
-                candidate = again[j];
-                break;
-              }
+            if (again[j] === fromVideo) continue;
+            var t = again[j].getBoundingClientRect().top + window.scrollY;
+            var ft = fromVideo
+              ? fromVideo.getBoundingClientRect().top + window.scrollY
+              : 0;
+            if (t > ft + 80) {
+              candidate = again[j];
+              break;
             }
           }
         }
@@ -233,7 +229,6 @@
       log('skip goNext (cooldown)', reason);
       return;
     }
-    // Ignore duplicate end signals from the same clip within the cooldown window.
     if (key && key === lastAdvanceFromSrc && now - lastAdvanceAt < ADVANCE_COOLDOWN_MS) {
       log('skip goNext (same clip)', reason);
       return;
@@ -270,8 +265,7 @@
     var timer = window.setTimeout(function () {
       endTimers.delete(video);
       if (video.paused) return;
-      // Only the most on-screen playing video may advance the feed.
-      if (visibilityScore(video) < 0.35 && video !== lastActiveVideo) return;
+      if (visibilityScore(video) < 0.25 && video !== lastActiveVideo) return;
       var left = video.duration - video.currentTime;
       if (left > 0.55) {
         armEndTimer(video);
@@ -289,6 +283,20 @@
     endTimers.set(video, timer);
   }
 
+  function markPlaying(video, why) {
+    if (!isUsableVideo(video) || video.paused) return;
+    if (lastActiveVideo !== video) {
+      log('playing', why, {
+        duration: video.duration,
+        t: video.currentTime,
+        vis: Math.round(visibilityScore(video) * 100) + '%'
+      });
+    }
+    lastActiveVideo = video;
+    disableLoop(video);
+    armEndTimer(video);
+  }
+
   function attachVideo(video) {
     if (!isUsableVideo(video) || attached.has(video)) return;
     attached.add(video);
@@ -303,24 +311,24 @@
     var nearEnd = false;
 
     video.addEventListener('play', function () {
-      lastActiveVideo = video;
-      disableLoop(video);
       nearEnd = false;
-      armEndTimer(video);
+      markPlaying(video, 'play-event');
     });
-
+    video.addEventListener('playing', function () {
+      markPlaying(video, 'playing-event');
+    });
     video.addEventListener('loadedmetadata', function () {
-      if (!video.paused) armEndTimer(video);
+      if (!video.paused) markPlaying(video, 'metadata');
     });
-
+    video.addEventListener('durationchange', function () {
+      if (!video.paused) markPlaying(video, 'durationchange');
+    });
     video.addEventListener('seeked', function () {
       if (!video.paused) armEndTimer(video);
     });
-
     video.addEventListener('pause', function () {
       clearEndTimer(video);
     });
-
     video.addEventListener('ended', function () {
       clearEndTimer(video);
       goNext('ended', video);
@@ -329,6 +337,10 @@
     video.addEventListener('timeupdate', function () {
       if (!isFinite(video.duration) || video.duration < 1) return;
       if (video.paused) return;
+
+      // HLS often skips a clean play event — treat timeupdate as proof of playback.
+      if (video.currentTime > 0.05) markPlaying(video, 'timeupdate');
+
       var remaining = video.duration - video.currentTime;
       if (remaining <= 0.35 && remaining >= 0) {
         nearEnd = true;
@@ -348,10 +360,7 @@
       if (remaining > 1) nearEnd = false;
     });
 
-    if (!video.paused) {
-      lastActiveVideo = video;
-      armEndTimer(video);
-    }
+    if (!video.paused) markPlaying(video, 'already-playing');
   }
 
   function scan() {
@@ -359,14 +368,33 @@
     for (var i = 0; i < videos.length; i++) attachVideo(videos[i]);
   }
 
+  // Catch players that start without firing play/playing reliably.
+  function heartbeat() {
+    scan();
+    var videos = listTimelineVideos();
+    var best = null;
+    var bestScore = 0;
+    for (var i = 0; i < videos.length; i++) {
+      var v = videos[i];
+      if (v.paused || !isFinite(v.duration) || v.duration < 0.5) continue;
+      if (v.currentTime < 0.05) continue;
+      var score = visibilityScore(v);
+      if (score > bestScore) {
+        bestScore = score;
+        best = v;
+      }
+    }
+    if (best) markPlaying(best, 'heartbeat');
+  }
+
   function boot() {
-    log('boot v1.3.0 — timeline scroll mode', location.href);
+    log('boot v1.3.1 — timeline scroll mode', location.href);
     scan();
     new MutationObserver(scan).observe(document.documentElement, {
       childList: true,
       subtree: true
     });
-    window.setInterval(scan, 2500);
+    window.setInterval(heartbeat, 1000);
   }
 
   if (document.readyState === 'loading') {
@@ -376,20 +404,28 @@
   }
 
   function probe() {
+    var vids = listTimelineVideos().map(function (v) {
+      return {
+        paused: v.paused,
+        t: Math.round(v.currentTime * 10) / 10,
+        d: isFinite(v.duration) ? Math.round(v.duration * 10) / 10 : null,
+        vis: Math.round(visibilityScore(v) * 100)
+      };
+    });
     var report = {
       href: location.href,
-      viewerNext: !!(findNextVideoButton() && findNextVideoButton().getAttribute('aria-label')),
-      timelineVideos: listTimelineVideos().length,
+      viewerNext: !!findNextVideoButton(),
+      timelineVideos: vids.length,
       lastActive: !!(lastActiveVideo && lastActiveVideo.isConnected),
-      advancing: advancing
+      advancing: advancing,
+      vids: vids
     };
     console.log('[X-AutoNext] probe', report);
     return report;
   }
 
-  // Expose to the page console (Firefox/Chrome Tampermonkey isolated worlds).
-  pageWindow.__xAutoNext = function () {
+  window.__xAutoNext = function () {
     goNext('manual', lastActiveVideo);
   };
-  pageWindow.__xAutoNextProbe = probe;
+  window.__xAutoNextProbe = probe;
 })();
