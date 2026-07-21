@@ -1,207 +1,86 @@
 // ==UserScript==
 // @name         X Desktop Video Auto Next
-// @namespace    http://tampermonkey.net/
-// @version      1.5.1
-// @description  On X/Twitter desktop, when a video ends, play the next video instead of looping
+// @namespace    https://github.com/CMRNCHN/x-desktop-video-auto-next
+// @version      2.0.0
+// @description  On X/Twitter desktop, when a video ends, play the next video instead of looping. Works in Chrome, Firefox, Safari, Edge, Brave, Opera.
 // @author       You
 // @match        https://x.com/*
 // @match        https://twitter.com/*
-// @updateURL    https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/main/x-desktop-video-auto-next.user.js
-// @downloadURL  https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/main/x-desktop-video-auto-next.user.js
 // @run-at       document-idle
-// @grant        unsafeWindow
+// @grant        none
 // ==/UserScript==
+
+/*
+ * Runs in page context (@grant none) so `window` is the real page window in
+ * every userscript manager (Tampermonkey, Violentmonkey, Safari Userscripts).
+ * That means no unsafeWindow / exportFunction / createObjectIn — those are what
+ * Safari's Userscripts extension rejects as "grant method not supported".
+ *
+ * Console helpers (available on any browser):
+ *   __xAutoNext()                       advance now
+ *   __xAutoNextProbe()                  print current state
+ *   __xAutoNext.setBrowser('chrome')    force a browser profile (then reload)
+ *   __xAutoNext.set({ endGuardMs: 250 })  override any setting (then reload)
+ *   __xAutoNext.clear()                 clear overrides (then reload)
+ */
 
 (function () {
   'use strict';
 
+  var VERSION = '2.0.0';
   var DEBUG = true;
 
-  /**
-   * Per-browser tuning. Detected browser picks one profile at boot.
-   * Override any key via localStorage:
-   *   localStorage.setItem('xAutoNext.browser', 'chrome'|'firefox'|'edge'|'safari'|'opera'|'brave'|'other')
-   *   localStorage.setItem('xAutoNext.settings', JSON.stringify({ advanceCooldownMs: 3000 }))
-   */
+  // ---- Per-browser tuning ------------------------------------------------
   var BROWSER_PROFILES = {
-    chrome: {
-      advanceCooldownMs: 2200,
-      endGuardMs: 140,
-      heartbeatMs: 900,
-      playNudgeDelayMs: 400,
-      playRetryDelayMs: 900,
-      openViewerHardNavDelayMs: 350,
-      scrollLoadDelayMs: 800,
-      minVideoWidth: 120,
-      preferViewerNavigation: true,
-      muteForAutoplay: true,
-      dispatchArrowDown: true,
-      usePointerEvents: true,
-      exportHelpersToPage: true,
-      notes: 'Chrome/Windows primary target. Mute before play() for autoplay policy.'
-    },
-    edge: {
-      advanceCooldownMs: 2200,
-      endGuardMs: 140,
-      heartbeatMs: 900,
-      playNudgeDelayMs: 400,
-      playRetryDelayMs: 900,
-      openViewerHardNavDelayMs: 350,
-      scrollLoadDelayMs: 800,
-      minVideoWidth: 120,
-      preferViewerNavigation: true,
-      muteForAutoplay: true,
-      dispatchArrowDown: true,
-      usePointerEvents: true,
-      exportHelpersToPage: true,
-      notes: 'Chromium Edge — same autoplay rules as Chrome.'
-    },
-    brave: {
-      advanceCooldownMs: 2400,
-      endGuardMs: 160,
-      heartbeatMs: 1000,
-      playNudgeDelayMs: 450,
-      playRetryDelayMs: 1000,
-      openViewerHardNavDelayMs: 400,
-      scrollLoadDelayMs: 850,
-      minVideoWidth: 120,
-      preferViewerNavigation: true,
-      muteForAutoplay: true,
-      dispatchArrowDown: true,
-      usePointerEvents: true,
-      exportHelpersToPage: true,
-      notes: 'Brave shields can delay media; slightly longer delays.'
-    },
-    opera: {
-      advanceCooldownMs: 2200,
-      endGuardMs: 140,
-      heartbeatMs: 900,
-      playNudgeDelayMs: 400,
-      playRetryDelayMs: 900,
-      openViewerHardNavDelayMs: 350,
-      scrollLoadDelayMs: 800,
-      minVideoWidth: 120,
-      preferViewerNavigation: true,
-      muteForAutoplay: true,
-      dispatchArrowDown: true,
-      usePointerEvents: true,
-      exportHelpersToPage: true,
-      notes: 'Opera Chromium build.'
-    },
-    firefox: {
-      advanceCooldownMs: 2600,
-      endGuardMs: 180,
-      heartbeatMs: 1100,
-      playNudgeDelayMs: 500,
-      playRetryDelayMs: 1100,
-      openViewerHardNavDelayMs: 450,
-      scrollLoadDelayMs: 900,
-      minVideoWidth: 120,
-      preferViewerNavigation: true,
-      muteForAutoplay: true,
-      dispatchArrowDown: true,
-      usePointerEvents: false,
-      exportHelpersToPage: true,
-      notes: 'Firefox needs unsafeWindow for console helpers; prefer .click() over PointerEvent.'
-    },
-    safari: {
-      advanceCooldownMs: 2800,
-      endGuardMs: 200,
-      heartbeatMs: 1200,
-      playNudgeDelayMs: 550,
-      playRetryDelayMs: 1200,
-      openViewerHardNavDelayMs: 500,
-      scrollLoadDelayMs: 1000,
-      minVideoWidth: 140,
-      preferViewerNavigation: true,
-      muteForAutoplay: true,
-      dispatchArrowDown: false,
-      usePointerEvents: false,
-      exportHelpersToPage: true,
-      notes: 'Safari autoplay is strict; rely more on viewer navigation + muted play.'
-    },
-    other: {
-      advanceCooldownMs: 2500,
-      endGuardMs: 160,
-      heartbeatMs: 1000,
-      playNudgeDelayMs: 450,
-      playRetryDelayMs: 1000,
-      openViewerHardNavDelayMs: 400,
-      scrollLoadDelayMs: 850,
-      minVideoWidth: 120,
-      preferViewerNavigation: true,
-      muteForAutoplay: true,
-      dispatchArrowDown: true,
-      usePointerEvents: true,
-      exportHelpersToPage: true,
-      notes: 'Generic fallback profile.'
-    }
+    chrome: { advanceCooldownMs: 2200, endGuardMs: 140, heartbeatMs: 900, playNudgeMs: 400, playRetryMs: 900, viewerNavDelayMs: 350, scrollLoadMs: 800, minVideoPx: 120, preferViewer: true, muteForAutoplay: true, dispatchArrowDown: true, usePointerEvents: true, notes: 'Chrome primary target.' },
+    edge:   { advanceCooldownMs: 2200, endGuardMs: 140, heartbeatMs: 900, playNudgeMs: 400, playRetryMs: 900, viewerNavDelayMs: 350, scrollLoadMs: 800, minVideoPx: 120, preferViewer: true, muteForAutoplay: true, dispatchArrowDown: true, usePointerEvents: true, notes: 'Chromium Edge.' },
+    brave:  { advanceCooldownMs: 2400, endGuardMs: 160, heartbeatMs: 1000, playNudgeMs: 450, playRetryMs: 1000, viewerNavDelayMs: 400, scrollLoadMs: 850, minVideoPx: 120, preferViewer: true, muteForAutoplay: true, dispatchArrowDown: true, usePointerEvents: true, notes: 'Brave shields may delay media.' },
+    opera:  { advanceCooldownMs: 2200, endGuardMs: 140, heartbeatMs: 900, playNudgeMs: 400, playRetryMs: 900, viewerNavDelayMs: 350, scrollLoadMs: 800, minVideoPx: 120, preferViewer: true, muteForAutoplay: true, dispatchArrowDown: true, usePointerEvents: true, notes: 'Opera Chromium.' },
+    firefox:{ advanceCooldownMs: 2600, endGuardMs: 180, heartbeatMs: 1100, playNudgeMs: 500, playRetryMs: 1100, viewerNavDelayMs: 450, scrollLoadMs: 900, minVideoPx: 120, preferViewer: true, muteForAutoplay: true, dispatchArrowDown: true, usePointerEvents: false, notes: 'Firefox: prefer .click() over PointerEvent.' },
+    safari: { advanceCooldownMs: 2800, endGuardMs: 200, heartbeatMs: 1200, playNudgeMs: 550, playRetryMs: 1200, viewerNavDelayMs: 500, scrollLoadMs: 1000, minVideoPx: 140, preferViewer: true, muteForAutoplay: true, dispatchArrowDown: false, usePointerEvents: false, notes: 'Safari autoplay is strict; rely on viewer nav + muted play.' },
+    other:  { advanceCooldownMs: 2500, endGuardMs: 160, heartbeatMs: 1000, playNudgeMs: 450, playRetryMs: 1000, viewerNavDelayMs: 400, scrollLoadMs: 850, minVideoPx: 120, preferViewer: true, muteForAutoplay: true, dispatchArrowDown: true, usePointerEvents: true, notes: 'Generic fallback.' }
   };
 
   function detectBrowserId() {
     try {
       var forced = localStorage.getItem('xAutoNext.browser');
       if (forced && BROWSER_PROFILES[forced]) return forced;
-    } catch (err) {
-      // ignore
-    }
+    } catch (e) { /* ignore */ }
 
     var ua = navigator.userAgent || '';
-    var brands =
-      (navigator.userAgentData && navigator.userAgentData.brands) || [];
-    var brandStr = brands
-      .map(function (b) {
-        return b.brand || '';
-      })
-      .join(' ')
-      .toLowerCase();
+    var brands = (navigator.userAgentData && navigator.userAgentData.brands) || [];
+    var brandStr = brands.map(function (b) { return b.brand || ''; }).join(' ').toLowerCase();
 
-    // Order matters (Edge/Opera/Brave include Chrome in UA).
-    if (/brave/i.test(ua) || brandStr.indexOf('brave') !== -1) return 'brave';
+    // Order matters: Edge/Opera/Brave UAs also contain "Chrome".
+    if (navigator.brave || brandStr.indexOf('brave') !== -1) return 'brave';
     if (/edg\//i.test(ua) || brandStr.indexOf('microsoft edge') !== -1) return 'edge';
-    if (/opr\//i.test(ua) || /opera/i.test(ua)) return 'opera';
-    if (/firefox\//i.test(ua) || typeof InstallTrigger !== 'undefined') return 'firefox';
-    if (
-      /safari/i.test(ua) &&
-      !/chrome|chromium|crios|android/i.test(ua)
-    ) {
-      return 'safari';
-    }
-    if (/chrome|crios|chromium/i.test(ua) || brandStr.indexOf('chrome') !== -1) {
-      return 'chrome';
-    }
+    if (/opr\//i.test(ua) || /opera/i.test(ua) || brandStr.indexOf('opera') !== -1) return 'opera';
+    if (/firefox\//i.test(ua)) return 'firefox';
+    if (/safari/i.test(ua) && !/chrome|chromium|crios|android/i.test(ua)) return 'safari';
+    if (/chrome|crios|chromium/i.test(ua) || brandStr.indexOf('chromium') !== -1) return 'chrome';
     return 'other';
   }
 
-  function loadSettings() {
+  function loadConfig() {
     var id = detectBrowserId();
     var base = BROWSER_PROFILES[id] || BROWSER_PROFILES.other;
-    var settings = {};
-    var key;
-    for (key in base) {
-      if (Object.prototype.hasOwnProperty.call(base, key)) settings[key] = base[key];
-    }
-    settings.browserId = id;
+    var cfg = {};
+    for (var k in base) if (Object.prototype.hasOwnProperty.call(base, k)) cfg[k] = base[k];
+    cfg.browserId = id;
 
     try {
       var raw = localStorage.getItem('xAutoNext.settings');
       if (raw) {
-        var override = JSON.parse(raw);
-        for (key in override) {
-          if (Object.prototype.hasOwnProperty.call(override, key)) {
-            settings[key] = override[key];
-          }
-        }
+        var ov = JSON.parse(raw);
+        for (var j in ov) if (Object.prototype.hasOwnProperty.call(ov, j)) cfg[j] = ov[j];
       }
-    } catch (err2) {
-      // ignore bad overrides
-    }
-    return settings;
+    } catch (e) { /* ignore bad overrides */ }
+    return cfg;
   }
 
-  var CFG = loadSettings();
-  var pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
+  var CFG = loadConfig();
 
+  // ---- State -------------------------------------------------------------
   var attached = new WeakSet();
   var endTimers = new WeakMap();
   var advancing = false;
@@ -212,19 +91,50 @@
 
   function log() {
     if (!DEBUG) return;
-    var args = ['[X-AutoNext]'].concat([].slice.call(arguments));
-    console.log.apply(console, args);
+    console.log.apply(console, ['[X-AutoNext]'].concat([].slice.call(arguments)));
   }
 
-  function unlockAdvanceSoon() {
-    window.clearTimeout(advanceUnlockTimer);
-    advanceUnlockTimer = window.setTimeout(function () {
-      advancing = false;
-    }, CFG.advanceCooldownMs);
-  }
-
+  // ---- Helpers -----------------------------------------------------------
   function isVideoEl(node) {
     return !!(node && node.nodeType === 1 && String(node.tagName).toUpperCase() === 'VIDEO');
+  }
+
+  function isUsableVideo(v) {
+    if (!isVideoEl(v) || !v.isConnected) return false;
+    var r = v.getBoundingClientRect();
+    return r.width >= CFG.minVideoPx && r.height >= CFG.minVideoPx;
+  }
+
+  function visibilityScore(v) {
+    var r = v.getBoundingClientRect();
+    var vh = window.innerHeight || 1;
+    var visible = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+    if (visible <= 0) return 0;
+    return visible / Math.max(r.height, 1);
+  }
+
+  function listTimelineVideos() {
+    var nodes = document.querySelectorAll('video');
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) if (isUsableVideo(nodes[i])) out.push(nodes[i]);
+    return out;
+  }
+
+  function containerFor(v) {
+    return v.closest('article') || v.closest('[data-testid="cellInnerDiv"]') || v.parentElement || v;
+  }
+
+  function srcKey(v) {
+    return (v && (v.currentSrc || v.src || '')) || '';
+  }
+
+  function clearEndTimer(v) {
+    var t = endTimers.get(v);
+    if (t) { window.clearTimeout(t); endTimers.delete(v); }
+  }
+
+  function disableLoop(v) {
+    try { v.loop = false; v.removeAttribute('loop'); } catch (e) { /* ignore */ }
   }
 
   function findNextVideoButton() {
@@ -232,8 +142,7 @@
     if (exact) return exact;
     var nodes = document.querySelectorAll('[aria-label]');
     for (var i = 0; i < nodes.length; i++) {
-      var label = (nodes[i].getAttribute('aria-label') || '').toLowerCase();
-      if (label.indexOf('next video') !== -1) return nodes[i];
+      if ((nodes[i].getAttribute('aria-label') || '').toLowerCase().indexOf('next video') !== -1) return nodes[i];
     }
     return null;
   }
@@ -241,114 +150,28 @@
   function hardClick(el) {
     if (!el) return false;
     try {
+      var opts = { bubbles: true, cancelable: true, view: window };
       if (CFG.usePointerEvents && typeof PointerEvent === 'function') {
-        el.dispatchEvent(
-          new PointerEvent('pointerdown', {
-            bubbles: true,
-            cancelable: true,
-            pointerType: 'mouse',
-            view: pageWindow
-          })
-        );
+        el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse', view: window }));
       }
-      el.dispatchEvent(
-        new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: pageWindow })
-      );
+      el.dispatchEvent(new MouseEvent('mousedown', opts));
       if (CFG.usePointerEvents && typeof PointerEvent === 'function') {
-        el.dispatchEvent(
-          new PointerEvent('pointerup', {
-            bubbles: true,
-            cancelable: true,
-            pointerType: 'mouse',
-            view: pageWindow
-          })
-        );
+        el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'mouse', view: window }));
       }
-      el.dispatchEvent(
-        new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: pageWindow })
-      );
-      el.dispatchEvent(
-        new MouseEvent('click', { bubbles: true, cancelable: true, view: pageWindow })
-      );
+      el.dispatchEvent(new MouseEvent('mouseup', opts));
+      el.dispatchEvent(new MouseEvent('click', opts));
       if (typeof el.click === 'function') el.click();
       return true;
-    } catch (err) {
-      try {
-        if (typeof el.click === 'function') {
-          el.click();
-          return true;
-        }
-      } catch (err2) {
-        // ignore
-      }
+    } catch (e) {
+      try { if (typeof el.click === 'function') { el.click(); return true; } } catch (e2) { /* ignore */ }
       return false;
     }
   }
 
-  function isUsableVideo(video) {
-    if (!isVideoEl(video) || !video.isConnected) return false;
-    var rect = video.getBoundingClientRect();
-    if (rect.width < CFG.minVideoWidth || rect.height < CFG.minVideoWidth) return false;
-    return true;
-  }
-
-  function visibilityScore(video) {
-    var rect = video.getBoundingClientRect();
-    var vh = window.innerHeight || 1;
-    var visible = Math.min(rect.bottom, vh) - Math.max(rect.top, 0);
-    if (visible <= 0) return 0;
-    return visible / Math.max(rect.height, 1);
-  }
-
-  function listTimelineVideos() {
-    var nodes = document.querySelectorAll('video');
-    var out = [];
-    for (var i = 0; i < nodes.length; i++) {
-      if (isUsableVideo(nodes[i])) out.push(nodes[i]);
-    }
-    return out;
-  }
-
-  function containerFor(video) {
-    return (
-      video.closest('article') ||
-      video.closest('[data-testid="cellInnerDiv"]') ||
-      video.parentElement ||
-      video
-    );
-  }
-
-  function srcKey(video) {
-    return (video && (video.currentSrc || video.src || '')) || '';
-  }
-
-  function clearEndTimer(video) {
-    var t = endTimers.get(video);
-    if (t) {
-      window.clearTimeout(t);
-      endTimers.delete(video);
-    }
-  }
-
-  function disableLoop(video) {
-    try {
-      video.loop = false;
-      video.removeAttribute('loop');
-    } catch (err) {
-      // ignore
-    }
-  }
-
-  function statusVideoHref(video) {
-    var box = containerFor(video);
-    var existing = box.querySelector('a[href*="/status/"][href*="/video/"]');
-    if (existing) {
-      try {
-        return existing.href;
-      } catch (err) {
-        // ignore
-      }
-    }
+  function statusVideoHref(v) {
+    var box = containerFor(v);
+    var direct = box.querySelector('a[href*="/status/"][href*="/video/"]');
+    if (direct) { try { return direct.href; } catch (e) { /* ignore */ } }
     var anchors = box.querySelectorAll('a[href*="/status/"]');
     for (var i = 0; i < anchors.length; i++) {
       var href = anchors[i].getAttribute('href') || '';
@@ -363,125 +186,87 @@
     var idx = fromVideo ? videos.indexOf(fromVideo) : -1;
     if (idx >= 0 && idx < videos.length - 1) return videos[idx + 1];
 
-    var fromTop = fromVideo
-      ? fromVideo.getBoundingClientRect().top + window.scrollY
-      : window.scrollY;
+    var fromTop = fromVideo ? fromVideo.getBoundingClientRect().top + window.scrollY : window.scrollY;
     for (var i = 0; i < videos.length; i++) {
       if (videos[i] === fromVideo) continue;
-      var top = videos[i].getBoundingClientRect().top + window.scrollY;
-      if (top > fromTop + 80) return videos[i];
+      if (videos[i].getBoundingClientRect().top + window.scrollY > fromTop + 80) return videos[i];
     }
     return null;
   }
 
-  function playVideo(video) {
-    disableLoop(video);
+  // ---- Playback ----------------------------------------------------------
+  function playVideo(v) {
+    disableLoop(v);
     if (CFG.muteForAutoplay) {
-      try {
-        video.defaultMuted = true;
-        video.muted = true;
-        video.setAttribute('muted', '');
-        video.volume = 0;
-      } catch (err) {
-        // ignore
-      }
+      try { v.defaultMuted = true; v.muted = true; v.setAttribute('muted', ''); v.volume = 0; } catch (e) { /* ignore */ }
     }
-    var box = containerFor(video);
-    var player =
-      box.querySelector('[data-testid="videoPlayer"]') ||
-      box.querySelector('[data-testid="videoComponent"]') ||
-      video;
+    var box = containerFor(v);
+    var player = box.querySelector('[data-testid="videoPlayer"]') || box.querySelector('[data-testid="videoComponent"]') || v;
     hardClick(player);
-    var playBtn =
-      box.querySelector('[aria-label="Play"]') ||
-      box.querySelector('[aria-label="Play video"]');
+    var playBtn = box.querySelector('[aria-label="Play"]') || box.querySelector('[aria-label="Play video"]');
     if (playBtn) hardClick(playBtn);
     try {
-      var p = video.play();
-      if (p && typeof p.catch === 'function') p.catch(function () {});
-    } catch (err2) {
-      // ignore
-    }
+      var p = v.play();
+      if (p && typeof p.catch === 'function') p.catch(function () { /* autoplay blocked */ });
+    } catch (e) { /* ignore */ }
   }
 
-  function openInVideoViewer(video) {
-    var href = statusVideoHref(video);
+  function openInVideoViewer(v) {
+    var href = statusVideoHref(v);
     log('open viewer', href);
     if (!href) return false;
 
-    var box = containerFor(video);
+    var box = containerFor(v);
     var link = box.querySelector('a[href*="/status/"][href*="/video/"]');
-    if (link) {
-      hardClick(link);
-      return true;
-    }
+    if (link) { hardClick(link); return true; }
 
     try {
-      pageWindow.history.pushState({}, '', href);
-      pageWindow.dispatchEvent(new PopStateEvent('popstate'));
-    } catch (err) {
-      // ignore
-    }
+      window.history.pushState({}, '', href);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    } catch (e) { /* ignore */ }
     window.setTimeout(function () {
-      if (!/\/status\/\d+\/video\//.test(location.pathname)) {
-        location.assign(href);
-      }
-    }, CFG.openViewerHardNavDelayMs);
+      if (!/\/status\/\d+\/video\//.test(location.pathname)) location.assign(href);
+    }, CFG.viewerNavDelayMs);
     return true;
   }
 
   function activateTimelineVideo(next, fromVideo) {
-    log('activate timeline video', {
-      from: srcKey(fromVideo).slice(0, 64),
-      to: srcKey(next).slice(0, 64)
-    });
+    log('activate', { from: srcKey(fromVideo).slice(0, 48), to: srcKey(next).slice(0, 48) });
 
     if (fromVideo && fromVideo !== next) {
       clearEndTimer(fromVideo);
-      try {
-        fromVideo.pause();
-      } catch (err) {
-        // ignore
-      }
+      try { fromVideo.pause(); } catch (e) { /* ignore */ }
     }
 
-    if (CFG.preferViewerNavigation && openInVideoViewer(next)) {
+    if (CFG.preferViewer && openInVideoViewer(next)) {
       lastActiveVideo = next;
       return;
     }
 
     var box = containerFor(next);
-    try {
-      box.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-    } catch (err2) {
-      box.scrollIntoView(true);
-    }
+    try { box.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); }
+    catch (e) { box.scrollIntoView(true); }
 
-    window.setTimeout(function () {
-      playVideo(next);
-      lastActiveVideo = next;
-    }, CFG.playNudgeDelayMs);
-    window.setTimeout(function () {
-      if (next.isConnected && next.paused) playVideo(next);
-    }, CFG.playRetryDelayMs);
+    window.setTimeout(function () { playVideo(next); lastActiveVideo = next; }, CFG.playNudgeMs);
+    window.setTimeout(function () { if (next.isConnected && next.paused) playVideo(next); }, CFG.playRetryMs);
   }
 
   function scrollToNextTimelineVideo(fromVideo) {
     var next = findNextTimelineVideo(fromVideo);
-    if (!next) {
-      log('no next video in DOM — scrolling to load more');
-      window.scrollBy(0, Math.max(window.innerHeight * 0.9, 700));
-      window.setTimeout(function () {
-        var candidate = findNextTimelineVideo(fromVideo);
-        if (candidate) activateTimelineVideo(candidate, fromVideo);
-        else {
-          log('still no next video after scroll');
-          advancing = false;
-        }
-      }, CFG.scrollLoadDelayMs);
-      return;
-    }
-    activateTimelineVideo(next, fromVideo);
+    if (next) { activateTimelineVideo(next, fromVideo); return; }
+
+    log('no next video in DOM — scrolling to load more');
+    window.scrollBy(0, Math.max(window.innerHeight * 0.9, 700));
+    window.setTimeout(function () {
+      var candidate = findNextTimelineVideo(fromVideo);
+      if (candidate) activateTimelineVideo(candidate, fromVideo);
+      else { log('still no next video after scroll'); advancing = false; }
+    }, CFG.scrollLoadMs);
+  }
+
+  function unlockAdvanceSoon() {
+    window.clearTimeout(advanceUnlockTimer);
+    advanceUnlockTimer = window.setTimeout(function () { advancing = false; }, CFG.advanceCooldownMs);
   }
 
   function goNext(reason, fromVideo) {
@@ -489,12 +274,9 @@
     var source = fromVideo || lastActiveVideo;
     var key = srcKey(source);
 
-    if (advancing) {
-      log('skip goNext (cooldown)', reason);
-      return;
-    }
+    if (advancing) { log('skip (cooldown)', reason); return; }
     if (key && key === lastAdvanceFromSrc && now - lastAdvanceAt < CFG.advanceCooldownMs) {
-      log('skip goNext (same clip)', reason);
+      log('skip (same clip)', reason);
       return;
     }
 
@@ -504,147 +286,90 @@
     unlockAdvanceSoon();
 
     var viewerNext = findNextVideoButton();
-    log('goNext', reason, {
-      browser: CFG.browserId,
-      path: location.pathname,
-      hasViewerNext: !!viewerNext,
-      videos: listTimelineVideos().length
-    });
+    log('goNext', reason, { browser: CFG.browserId, path: location.pathname, hasViewerNext: !!viewerNext, videos: listTimelineVideos().length });
 
-    if (viewerNext && hardClick(viewerNext)) {
-      log('clicked Next video');
-      return;
-    }
+    // In the immersive video viewer, X's own Next-video control gives endless play.
+    if (viewerNext && hardClick(viewerNext)) { log('clicked Next video'); return; }
 
     if (CFG.dispatchArrowDown && /\/status\/\d+/.test(location.pathname)) {
       try {
-        document.body.dispatchEvent(
-          new KeyboardEvent('keydown', {
-            key: 'ArrowDown',
-            code: 'ArrowDown',
-            keyCode: 40,
-            which: 40,
-            bubbles: true,
-            cancelable: true,
-            view: pageWindow
-          })
-        );
+        document.body.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true, cancelable: true, view: window
+        }));
         log('dispatched ArrowDown');
-      } catch (err) {
-        // ignore
-      }
+      } catch (e) { /* ignore */ }
     }
 
     scrollToNextTimelineVideo(source);
   }
 
-  function armEndTimer(video) {
-    clearEndTimer(video);
-    if (!isFinite(video.duration) || video.duration <= 0.5) return;
-    if (video.paused) return;
+  // ---- End detection -----------------------------------------------------
+  function armEndTimer(v) {
+    clearEndTimer(v);
+    if (!isFinite(v.duration) || v.duration <= 0.5 || v.paused) return;
 
-    var remainingMs = (video.duration - video.currentTime) * 1000 - CFG.endGuardMs;
+    var remainingMs = (v.duration - v.currentTime) * 1000 - CFG.endGuardMs;
     if (remainingMs < 40) remainingMs = 40;
 
-    var timer = window.setTimeout(function () {
-      endTimers.delete(video);
-      if (video.paused) return;
-      if (video !== lastActiveVideo && visibilityScore(video) < 0.5) return;
-      var left = video.duration - video.currentTime;
-      if (left > 0.55) {
-        armEndTimer(video);
-        return;
-      }
-      log('end-guard', { left: left, duration: video.duration });
-      try {
-        video.pause();
-      } catch (err) {
-        // ignore
-      }
-      goNext('end-guard', video);
-    }, remainingMs);
-
-    endTimers.set(video, timer);
+    endTimers.set(v, window.setTimeout(function () {
+      endTimers.delete(v);
+      if (v.paused) return;
+      if (v !== lastActiveVideo && visibilityScore(v) < 0.5) return;
+      var left = v.duration - v.currentTime;
+      if (left > 0.55) { armEndTimer(v); return; }
+      log('end-guard', { left: left, duration: v.duration });
+      try { v.pause(); } catch (e) { /* ignore */ }
+      goNext('end-guard', v);
+    }, remainingMs));
   }
 
-  function markPlaying(video, why) {
-    if (!isUsableVideo(video) || video.paused) return;
-    if (lastActiveVideo !== video) {
-      log('playing', why, {
-        duration: video.duration,
-        t: Math.round(video.currentTime * 100) / 100,
-        vis: Math.round(visibilityScore(video) * 100) + '%'
-      });
+  function markPlaying(v, why) {
+    if (!isUsableVideo(v) || v.paused) return;
+    if (lastActiveVideo !== v) {
+      log('playing', why, { d: v.duration, t: Math.round(v.currentTime * 100) / 100, vis: Math.round(visibilityScore(v) * 100) + '%' });
     }
-    lastActiveVideo = video;
-    disableLoop(video);
-    armEndTimer(video);
+    lastActiveVideo = v;
+    disableLoop(v);
+    armEndTimer(v);
   }
 
-  function attachVideo(video) {
-    if (!isUsableVideo(video) || attached.has(video)) return;
-    attached.add(video);
-    disableLoop(video);
-
-    log('attached', {
-      w: Math.round(video.getBoundingClientRect().width),
-      duration: video.duration,
-      paused: video.paused
-    });
+  function attachVideo(v) {
+    if (!isUsableVideo(v) || attached.has(v)) return;
+    attached.add(v);
+    disableLoop(v);
+    log('attached', { w: Math.round(v.getBoundingClientRect().width), duration: v.duration, paused: v.paused });
 
     var nearEnd = false;
 
-    video.addEventListener('play', function () {
-      nearEnd = false;
-      markPlaying(video, 'play-event');
-    });
-    video.addEventListener('playing', function () {
-      markPlaying(video, 'playing-event');
-    });
-    video.addEventListener('loadedmetadata', function () {
-      if (!video.paused) markPlaying(video, 'metadata');
-    });
-    video.addEventListener('durationchange', function () {
-      if (!video.paused) markPlaying(video, 'durationchange');
-    });
-    video.addEventListener('seeked', function () {
-      if (!video.paused) armEndTimer(video);
-    });
-    video.addEventListener('pause', function () {
-      clearEndTimer(video);
-    });
-    video.addEventListener('ended', function () {
-      clearEndTimer(video);
-      if (video === lastActiveVideo || visibilityScore(video) >= 0.5) {
-        goNext('ended', video);
-      }
+    v.addEventListener('play', function () { nearEnd = false; markPlaying(v, 'play'); });
+    v.addEventListener('playing', function () { markPlaying(v, 'playing'); });
+    v.addEventListener('loadedmetadata', function () { if (!v.paused) markPlaying(v, 'metadata'); });
+    v.addEventListener('durationchange', function () { if (!v.paused) markPlaying(v, 'durationchange'); });
+    v.addEventListener('seeked', function () { if (!v.paused) armEndTimer(v); });
+    v.addEventListener('pause', function () { clearEndTimer(v); });
+    v.addEventListener('ended', function () {
+      clearEndTimer(v);
+      if (v === lastActiveVideo || visibilityScore(v) >= 0.5) goNext('ended', v);
     });
 
-    video.addEventListener('timeupdate', function () {
-      if (!isFinite(video.duration) || video.duration < 1 || video.paused) return;
-      if (video.currentTime > 0.05) markPlaying(video, 'timeupdate');
+    v.addEventListener('timeupdate', function () {
+      if (!isFinite(v.duration) || v.duration < 1 || v.paused) return;
+      if (v.currentTime > 0.05) markPlaying(v, 'timeupdate');
 
-      var remaining = video.duration - video.currentTime;
-      if (remaining <= 0.35 && remaining >= 0) {
-        nearEnd = true;
-        return;
-      }
-      if (nearEnd && video.currentTime < 0.45) {
+      var remaining = v.duration - v.currentTime;
+      if (remaining <= 0.35 && remaining >= 0) { nearEnd = true; return; }
+      if (nearEnd && v.currentTime < 0.45) {
         nearEnd = false;
-        if (video !== lastActiveVideo && visibilityScore(video) < 0.5) return;
+        if (v !== lastActiveVideo && visibilityScore(v) < 0.5) return;
         log('loop-restart');
-        try {
-          video.pause();
-        } catch (err) {
-          // ignore
-        }
-        goNext('loop-restart', video);
+        try { v.pause(); } catch (e) { /* ignore */ }
+        goNext('loop-restart', v);
         return;
       }
       if (remaining > 1) nearEnd = false;
     });
 
-    if (!video.paused) markPlaying(video, 'already-playing');
+    if (!v.paused) markPlaying(v, 'already-playing');
   }
 
   function scan() {
@@ -655,197 +380,81 @@
   function heartbeat() {
     scan();
     var videos = listTimelineVideos();
-    var best = null;
-    var bestScore = 0;
+    var best = null, bestScore = 0;
     for (var i = 0; i < videos.length; i++) {
       var v = videos[i];
-      if (v.paused || !isFinite(v.duration) || v.duration < 0.5) continue;
-      if (v.currentTime < 0.05) continue;
-      var score = visibilityScore(v);
-      if (score > bestScore) {
-        bestScore = score;
-        best = v;
-      }
+      if (v.paused || !isFinite(v.duration) || v.duration < 0.5 || v.currentTime < 0.05) continue;
+      var s = visibilityScore(v);
+      if (s > bestScore) { bestScore = s; best = v; }
     }
     if (best) markPlaying(best, 'heartbeat');
   }
 
-  function setBrowserOverride(id) {
-    if (!BROWSER_PROFILES[id]) {
-      console.warn('[X-AutoNext] unknown browser id', id, Object.keys(BROWSER_PROFILES));
-      return false;
-    }
-    localStorage.setItem('xAutoNext.browser', id);
-    console.log('[X-AutoNext] browser override saved:', id, '— reload the page');
-    return true;
-  }
-
-  function setSettingsOverride(partial) {
-    var current = {};
-    try {
-      current = JSON.parse(localStorage.getItem('xAutoNext.settings') || '{}');
-    } catch (err) {
-      current = {};
-    }
-    var key;
-    for (key in partial || {}) {
-      if (Object.prototype.hasOwnProperty.call(partial, key)) current[key] = partial[key];
-    }
-    localStorage.setItem('xAutoNext.settings', JSON.stringify(current));
-    console.log('[X-AutoNext] settings override saved — reload the page', current);
-    return current;
-  }
-
-  function clearOverrides() {
-    localStorage.removeItem('xAutoNext.browser');
-    localStorage.removeItem('xAutoNext.settings');
-    console.log('[X-AutoNext] overrides cleared — reload the page');
-  }
-
-  function exportFn(fn, target, name) {
-    if (typeof exportFunction === 'function') {
-      try {
-        exportFunction(fn, target, { defineAs: name });
-        return true;
-      } catch (err) {
-        // fall through
-      }
-    }
-    try {
-      target[name] = fn;
-      return true;
-    } catch (err2) {
-      return false;
-    }
-  }
-
-  function exportHelpers() {
-    if (!CFG.exportHelpersToPage) return;
-
-    function nextFn() {
-      goNext('manual', lastActiveVideo);
-    }
-    function settingsFn() {
-      // Return a plain JSON-safe clone for page consoles.
-      return JSON.parse(JSON.stringify({
-        browserId: CFG.browserId,
-        advanceCooldownMs: CFG.advanceCooldownMs,
-        endGuardMs: CFG.endGuardMs,
-        heartbeatMs: CFG.heartbeatMs,
-        preferViewerNavigation: CFG.preferViewerNavigation,
-        muteForAutoplay: CFG.muteForAutoplay,
-        usePointerEvents: CFG.usePointerEvents,
-        dispatchArrowDown: CFG.dispatchArrowDown,
-        notes: CFG.notes
-      }));
-    }
-    function profilesFn() {
-      return JSON.parse(JSON.stringify(BROWSER_PROFILES));
-    }
-    function probeFn() {
-      return probe();
-    }
-
-    // Firefox: page console cannot call raw sandbox functions — use exportFunction.
-    var apiTarget = pageWindow;
-    if (typeof createObjectIn === 'function') {
-      try {
-        apiTarget = createObjectIn(pageWindow, { defineAs: '__xAutoNextApi' });
-      } catch (err) {
-        apiTarget = pageWindow;
-      }
-    } else {
-      try {
-        if (!pageWindow.__xAutoNextApi) pageWindow.__xAutoNextApi = {};
-        apiTarget = pageWindow.__xAutoNextApi;
-      } catch (err2) {
-        apiTarget = pageWindow;
-      }
-    }
-
-    exportFn(nextFn, pageWindow, '__xAutoNext');
-    exportFn(probeFn, pageWindow, '__xAutoNextProbe');
-    exportFn(nextFn, apiTarget, 'next');
-    exportFn(probeFn, apiTarget, 'probe');
-    exportFn(settingsFn, apiTarget, 'settings');
-    exportFn(setBrowserOverride, apiTarget, 'setBrowser');
-    exportFn(setSettingsOverride, apiTarget, 'setSettings');
-    exportFn(clearOverrides, apiTarget, 'clearOverrides');
-    exportFn(profilesFn, apiTarget, 'profiles');
-
-    if (apiTarget !== pageWindow) {
-      try {
-        pageWindow.__xAutoNextApi = apiTarget;
-      } catch (err3) {
-        // ignore
-      }
-    }
-
-    // Page-safe fallback (works even when function export is blocked):
-    //   localStorage.setItem('xAutoNext.browser', 'chrome'); location.reload();
-    //   window.postMessage({ source: 'x-autonext', cmd: 'setBrowser', id: 'chrome' }, '*');
-    pageWindow.addEventListener('message', function (event) {
-      if (event.source !== pageWindow) return;
-      var data = event.data;
-      if (!data || data.source !== 'x-autonext') return;
-      if (data.cmd === 'next') nextFn();
-      else if (data.cmd === 'probe') {
-        var report = probeFn();
-        pageWindow.postMessage({ source: 'x-autonext-result', cmd: 'probe', report: report }, '*');
-      } else if (data.cmd === 'setBrowser') setBrowserOverride(data.id);
-      else if (data.cmd === 'setSettings') setSettingsOverride(data.settings || {});
-      else if (data.cmd === 'clearOverrides') clearOverrides();
-      else if (data.cmd === 'settings') {
-        pageWindow.postMessage(
-          { source: 'x-autonext-result', cmd: 'settings', settings: settingsFn() },
-          '*'
-        );
-      }
-    });
-  }
-
+  // ---- Console API (page context, works in every browser) ----------------
   function probe() {
     var active = lastActiveVideo;
     var report = {
+      version: VERSION,
       browser: CFG.browserId,
-      settings: {
-        advanceCooldownMs: CFG.advanceCooldownMs,
-        endGuardMs: CFG.endGuardMs,
-        preferViewerNavigation: CFG.preferViewerNavigation,
-        muteForAutoplay: CFG.muteForAutoplay,
-        usePointerEvents: CFG.usePointerEvents,
-        dispatchArrowDown: CFG.dispatchArrowDown
-      },
       notes: CFG.notes,
       href: location.href,
       viewerNext: !!findNextVideoButton(),
       timelineVideos: listTimelineVideos().length,
       lastActive: !!(active && active.isConnected),
       nextHref: active ? statusVideoHref(findNextTimelineVideo(active) || active) : null,
-      advancing: advancing
+      advancing: advancing,
+      settings: {
+        advanceCooldownMs: CFG.advanceCooldownMs,
+        endGuardMs: CFG.endGuardMs,
+        preferViewer: CFG.preferViewer,
+        muteForAutoplay: CFG.muteForAutoplay,
+        usePointerEvents: CFG.usePointerEvents,
+        dispatchArrowDown: CFG.dispatchArrowDown
+      }
     };
     console.log('[X-AutoNext] probe', report);
     return report;
   }
 
+  function installApi() {
+    var api = function () { goNext('manual', lastActiveVideo); };
+    api.probe = probe;
+    api.settings = function () { return CFG; };
+    api.profiles = BROWSER_PROFILES;
+    api.setBrowser = function (id) {
+      if (!BROWSER_PROFILES[id]) { console.warn('[X-AutoNext] unknown browser id', id, Object.keys(BROWSER_PROFILES)); return false; }
+      try { localStorage.setItem('xAutoNext.browser', id); } catch (e) { /* ignore */ }
+      console.log('[X-AutoNext] browser set to', id, '— reload the page');
+      return true;
+    };
+    api.set = function (partial) {
+      var current = {};
+      try { current = JSON.parse(localStorage.getItem('xAutoNext.settings') || '{}'); } catch (e) { current = {}; }
+      for (var k in (partial || {})) if (Object.prototype.hasOwnProperty.call(partial, k)) current[k] = partial[k];
+      try { localStorage.setItem('xAutoNext.settings', JSON.stringify(current)); } catch (e2) { /* ignore */ }
+      console.log('[X-AutoNext] settings saved — reload the page', current);
+      return current;
+    };
+    api.clear = function () {
+      try { localStorage.removeItem('xAutoNext.browser'); localStorage.removeItem('xAutoNext.settings'); } catch (e) { /* ignore */ }
+      console.log('[X-AutoNext] overrides cleared — reload the page');
+    };
+
+    try {
+      window.__xAutoNext = api;
+      window.__xAutoNextProbe = probe;
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---- Boot --------------------------------------------------------------
   function boot() {
-    log('boot v1.5.1', {
-      browser: CFG.browserId,
-      notes: CFG.notes,
-      href: location.href
-    });
-    exportHelpers();
+    log('boot v' + VERSION, { browser: CFG.browserId, notes: CFG.notes, href: location.href });
+    installApi();
     scan();
-    new MutationObserver(scan).observe(document.documentElement, {
-      childList: true,
-      subtree: true
-    });
+    new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
     window.setInterval(heartbeat, CFG.heartbeatMs);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
