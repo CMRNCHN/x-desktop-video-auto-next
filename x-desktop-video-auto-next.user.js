@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X Desktop Video Auto Next
 // @namespace    http://tampermonkey.net/
-// @version      1.5.0
+// @version      1.5.1
 // @description  On X/Twitter desktop, when a video ends, play the next video instead of looping
 // @author       You
 // @match        https://x.com/*
@@ -378,7 +378,10 @@
     disableLoop(video);
     if (CFG.muteForAutoplay) {
       try {
+        video.defaultMuted = true;
         video.muted = true;
+        video.setAttribute('muted', '');
+        video.volume = 0;
       } catch (err) {
         // ignore
       }
@@ -667,58 +670,138 @@
     if (best) markPlaying(best, 'heartbeat');
   }
 
+  function setBrowserOverride(id) {
+    if (!BROWSER_PROFILES[id]) {
+      console.warn('[X-AutoNext] unknown browser id', id, Object.keys(BROWSER_PROFILES));
+      return false;
+    }
+    localStorage.setItem('xAutoNext.browser', id);
+    console.log('[X-AutoNext] browser override saved:', id, '— reload the page');
+    return true;
+  }
+
+  function setSettingsOverride(partial) {
+    var current = {};
+    try {
+      current = JSON.parse(localStorage.getItem('xAutoNext.settings') || '{}');
+    } catch (err) {
+      current = {};
+    }
+    var key;
+    for (key in partial || {}) {
+      if (Object.prototype.hasOwnProperty.call(partial, key)) current[key] = partial[key];
+    }
+    localStorage.setItem('xAutoNext.settings', JSON.stringify(current));
+    console.log('[X-AutoNext] settings override saved — reload the page', current);
+    return current;
+  }
+
+  function clearOverrides() {
+    localStorage.removeItem('xAutoNext.browser');
+    localStorage.removeItem('xAutoNext.settings');
+    console.log('[X-AutoNext] overrides cleared — reload the page');
+  }
+
+  function exportFn(fn, target, name) {
+    if (typeof exportFunction === 'function') {
+      try {
+        exportFunction(fn, target, { defineAs: name });
+        return true;
+      } catch (err) {
+        // fall through
+      }
+    }
+    try {
+      target[name] = fn;
+      return true;
+    } catch (err2) {
+      return false;
+    }
+  }
+
   function exportHelpers() {
     if (!CFG.exportHelpersToPage) return;
-    var api = {
-      next: function () {
-        goNext('manual', lastActiveVideo);
-      },
-      probe: probe,
-      settings: function () {
-        return CFG;
-      },
-      setBrowser: function (id) {
-        if (!BROWSER_PROFILES[id]) {
-          console.warn('[X-AutoNext] unknown browser id', id, Object.keys(BROWSER_PROFILES));
-          return false;
-        }
-        localStorage.setItem('xAutoNext.browser', id);
-        console.log('[X-AutoNext] browser override saved:', id, '— reload the page');
-        return true;
-      },
-      setSettings: function (partial) {
-        var current = {};
-        try {
-          current = JSON.parse(localStorage.getItem('xAutoNext.settings') || '{}');
-        } catch (err) {
-          current = {};
-        }
-        var key;
-        for (key in partial) {
-          if (Object.prototype.hasOwnProperty.call(partial, key)) current[key] = partial[key];
-        }
-        localStorage.setItem('xAutoNext.settings', JSON.stringify(current));
-        console.log('[X-AutoNext] settings override saved — reload the page', current);
-        return current;
-      },
-      clearOverrides: function () {
-        localStorage.removeItem('xAutoNext.browser');
-        localStorage.removeItem('xAutoNext.settings');
-        console.log('[X-AutoNext] overrides cleared — reload the page');
-      },
-      profiles: BROWSER_PROFILES
-    };
 
-    pageWindow.__xAutoNext = api.next;
-    pageWindow.__xAutoNextProbe = api.probe;
-    pageWindow.__xAutoNextApi = api;
-    try {
-      window.__xAutoNext = api.next;
-      window.__xAutoNextProbe = api.probe;
-      window.__xAutoNextApi = api;
-    } catch (err2) {
-      // ignore sandbox
+    function nextFn() {
+      goNext('manual', lastActiveVideo);
     }
+    function settingsFn() {
+      // Return a plain JSON-safe clone for page consoles.
+      return JSON.parse(JSON.stringify({
+        browserId: CFG.browserId,
+        advanceCooldownMs: CFG.advanceCooldownMs,
+        endGuardMs: CFG.endGuardMs,
+        heartbeatMs: CFG.heartbeatMs,
+        preferViewerNavigation: CFG.preferViewerNavigation,
+        muteForAutoplay: CFG.muteForAutoplay,
+        usePointerEvents: CFG.usePointerEvents,
+        dispatchArrowDown: CFG.dispatchArrowDown,
+        notes: CFG.notes
+      }));
+    }
+    function profilesFn() {
+      return JSON.parse(JSON.stringify(BROWSER_PROFILES));
+    }
+    function probeFn() {
+      return probe();
+    }
+
+    // Firefox: page console cannot call raw sandbox functions — use exportFunction.
+    var apiTarget = pageWindow;
+    if (typeof createObjectIn === 'function') {
+      try {
+        apiTarget = createObjectIn(pageWindow, { defineAs: '__xAutoNextApi' });
+      } catch (err) {
+        apiTarget = pageWindow;
+      }
+    } else {
+      try {
+        if (!pageWindow.__xAutoNextApi) pageWindow.__xAutoNextApi = {};
+        apiTarget = pageWindow.__xAutoNextApi;
+      } catch (err2) {
+        apiTarget = pageWindow;
+      }
+    }
+
+    exportFn(nextFn, pageWindow, '__xAutoNext');
+    exportFn(probeFn, pageWindow, '__xAutoNextProbe');
+    exportFn(nextFn, apiTarget, 'next');
+    exportFn(probeFn, apiTarget, 'probe');
+    exportFn(settingsFn, apiTarget, 'settings');
+    exportFn(setBrowserOverride, apiTarget, 'setBrowser');
+    exportFn(setSettingsOverride, apiTarget, 'setSettings');
+    exportFn(clearOverrides, apiTarget, 'clearOverrides');
+    exportFn(profilesFn, apiTarget, 'profiles');
+
+    if (apiTarget !== pageWindow) {
+      try {
+        pageWindow.__xAutoNextApi = apiTarget;
+      } catch (err3) {
+        // ignore
+      }
+    }
+
+    // Page-safe fallback (works even when function export is blocked):
+    //   localStorage.setItem('xAutoNext.browser', 'chrome'); location.reload();
+    //   window.postMessage({ source: 'x-autonext', cmd: 'setBrowser', id: 'chrome' }, '*');
+    pageWindow.addEventListener('message', function (event) {
+      if (event.source !== pageWindow) return;
+      var data = event.data;
+      if (!data || data.source !== 'x-autonext') return;
+      if (data.cmd === 'next') nextFn();
+      else if (data.cmd === 'probe') {
+        var report = probeFn();
+        pageWindow.postMessage({ source: 'x-autonext-result', cmd: 'probe', report: report }, '*');
+      } else if (data.cmd === 'setBrowser') setBrowserOverride(data.id);
+      else if (data.cmd === 'setSettings') setSettingsOverride(data.settings || {});
+      else if (data.cmd === 'clearOverrides') clearOverrides();
+      else if (data.cmd === 'settings') {
+        pageWindow.postMessage(
+          { source: 'x-autonext-result', cmd: 'settings', settings: settingsFn() },
+          '*'
+        );
+      }
+    });
   }
 
   function probe() {
@@ -746,7 +829,7 @@
   }
 
   function boot() {
-    log('boot v1.5.0', {
+    log('boot v1.5.1', {
       browser: CFG.browserId,
       notes: CFG.notes,
       href: location.href
