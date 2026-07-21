@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X Desktop Video Auto Next
 // @namespace    http://tampermonkey.net/
-// @version      1.2.0
+// @version      1.2.1
 // @description  On X/Twitter desktop, when a video ends, play the next timeline video instead of looping
 // @author       You
 // @match        https://x.com/*
@@ -326,7 +326,7 @@
   }
 
   function boot() {
-    log('boot', location.href);
+    log('boot v1.2.1 — timeline scroll mode', location.href);
     scan();
     new MutationObserver(scan).observe(document.documentElement, {
       childList: true,
