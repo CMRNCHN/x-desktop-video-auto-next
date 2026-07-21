@@ -1,34 +1,49 @@
 // ==UserScript==
 // @name         X Desktop Video Auto Next
 // @namespace    https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version      2.0.0
+// @version      2.0.1
 // @description  On X/Twitter desktop, when a video ends, play the next video instead of looping. Works in Chrome, Firefox, Safari, Edge, Brave, Opera.
 // @author       You
 // @match        https://x.com/*
 // @match        https://twitter.com/*
+// @updateURL    https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/main/x-desktop-video-auto-next.user.js
+// @downloadURL  https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/main/x-desktop-video-auto-next.user.js
 // @run-at       document-idle
 // @grant        none
+// @inject-into  page
 // ==/UserScript==
 
 /*
- * Runs in page context (@grant none) so `window` is the real page window in
- * every userscript manager (Tampermonkey, Violentmonkey, Safari Userscripts).
- * That means no unsafeWindow / exportFunction / createObjectIn — those are what
- * Safari's Userscripts extension rejects as "grant method not supported".
+ * IMPORTANT: Delete every older copy (v1.x / duplicate installs) in Tampermonkey.
+ * You must see exactly one boot line:  [X-AutoNext] boot v2.0.1
  *
- * Console helpers (available on any browser):
- *   __xAutoNext()                       advance now
- *   __xAutoNextProbe()                  print current state
- *   __xAutoNext.setBrowser('chrome')    force a browser profile (then reload)
- *   __xAutoNext.set({ endGuardMs: 250 })  override any setting (then reload)
- *   __xAutoNext.clear()                 clear overrides (then reload)
+ * Firefox page console cannot always call userscript functions (Xray /
+ * "Permission denied"). Use postMessage or localStorage instead:
+ *
+ *   postMessage({ source: 'x-autonext', cmd: 'next' }, '*')
+ *   postMessage({ source: 'x-autonext', cmd: 'probe' }, '*')
+ *   localStorage.setItem('xAutoNext.browser', 'firefox'); location.reload()
+ *   localStorage.setItem('xAutoNext.settings', JSON.stringify({ endGuardMs: 250 })); location.reload()
+ *   localStorage.removeItem('xAutoNext.browser'); localStorage.removeItem('xAutoNext.settings'); location.reload()
+ *
+ * Chrome / Edge usually also get:
+ *   __xAutoNext()  /  __xAutoNextProbe()
  */
 
 (function () {
   'use strict';
 
-  var VERSION = '2.0.0';
+  var VERSION = '2.0.1';
   var DEBUG = true;
+
+  // Prevent double-running when multiple copies are installed.
+  try {
+    if (window.__X_AUTO_NEXT_VERSION__) {
+      console.warn('[X-AutoNext] another copy already running (' + window.__X_AUTO_NEXT_VERSION__ + '). Delete old scripts in Tampermonkey. Skipping this copy v' + VERSION);
+      return;
+    }
+    window.__X_AUTO_NEXT_VERSION__ = VERSION;
+  } catch (e) { /* ignore */ }
 
   // ---- Per-browser tuning ------------------------------------------------
   var BROWSER_PROFILES = {
@@ -390,7 +405,7 @@
     if (best) markPlaying(best, 'heartbeat');
   }
 
-  // ---- Console API (page context, works in every browser) ----------------
+  // ---- Console / messaging API -------------------------------------------
   function probe() {
     var active = lastActiveVideo;
     var report = {
@@ -416,34 +431,75 @@
     return report;
   }
 
-  function installApi() {
-    var api = function () { goNext('manual', lastActiveVideo); };
-    api.probe = probe;
-    api.settings = function () { return CFG; };
-    api.profiles = BROWSER_PROFILES;
-    api.setBrowser = function (id) {
-      if (!BROWSER_PROFILES[id]) { console.warn('[X-AutoNext] unknown browser id', id, Object.keys(BROWSER_PROFILES)); return false; }
-      try { localStorage.setItem('xAutoNext.browser', id); } catch (e) { /* ignore */ }
-      console.log('[X-AutoNext] browser set to', id, '— reload the page');
-      return true;
-    };
-    api.set = function (partial) {
-      var current = {};
-      try { current = JSON.parse(localStorage.getItem('xAutoNext.settings') || '{}'); } catch (e) { current = {}; }
-      for (var k in (partial || {})) if (Object.prototype.hasOwnProperty.call(partial, k)) current[k] = partial[k];
-      try { localStorage.setItem('xAutoNext.settings', JSON.stringify(current)); } catch (e2) { /* ignore */ }
-      console.log('[X-AutoNext] settings saved — reload the page', current);
-      return current;
-    };
-    api.clear = function () {
-      try { localStorage.removeItem('xAutoNext.browser'); localStorage.removeItem('xAutoNext.settings'); } catch (e) { /* ignore */ }
-      console.log('[X-AutoNext] overrides cleared — reload the page');
-    };
+  function setBrowserOverride(id) {
+    if (!BROWSER_PROFILES[id]) {
+      console.warn('[X-AutoNext] unknown browser id', id, Object.keys(BROWSER_PROFILES));
+      return false;
+    }
+    try { localStorage.setItem('xAutoNext.browser', id); } catch (e) { /* ignore */ }
+    console.log('[X-AutoNext] browser set to', id, '— reload the page');
+    return true;
+  }
 
+  function setSettingsOverride(partial) {
+    var current = {};
+    try { current = JSON.parse(localStorage.getItem('xAutoNext.settings') || '{}'); } catch (e) { current = {}; }
+    for (var k in (partial || {})) if (Object.prototype.hasOwnProperty.call(partial, k)) current[k] = partial[k];
+    try { localStorage.setItem('xAutoNext.settings', JSON.stringify(current)); } catch (e2) { /* ignore */ }
+    console.log('[X-AutoNext] settings saved — reload the page', current);
+    return current;
+  }
+
+  function clearOverrides() {
     try {
+      localStorage.removeItem('xAutoNext.browser');
+      localStorage.removeItem('xAutoNext.settings');
+    } catch (e) { /* ignore */ }
+    console.log('[X-AutoNext] overrides cleared — reload the page');
+  }
+
+  function handleCommand(data) {
+    if (!data || typeof data !== 'object') return;
+    var cmd = data.cmd;
+    if (cmd === 'next') goNext('manual', lastActiveVideo);
+    else if (cmd === 'probe') {
+      var report = probe();
+      try { window.postMessage({ source: 'x-autonext-result', cmd: 'probe', report: report }, '*'); } catch (e) { /* ignore */ }
+    } else if (cmd === 'setBrowser') setBrowserOverride(data.id);
+    else if (cmd === 'setSettings' || cmd === 'set') setSettingsOverride(data.settings || data.partial || {});
+    else if (cmd === 'clearOverrides' || cmd === 'clear') clearOverrides();
+    else if (cmd === 'settings') {
+      try { window.postMessage({ source: 'x-autonext-result', cmd: 'settings', settings: CFG }, '*'); } catch (e2) { /* ignore */ }
+    }
+  }
+
+  function installApi() {
+    // Always-works path in Firefox page console (no function call across Xray).
+    window.addEventListener('message', function (event) {
+      if (event.source !== window) return;
+      var data = event.data;
+      if (!data || data.source !== 'x-autonext') return;
+      handleCommand(data);
+    });
+
+    // Best-effort direct helpers (Chrome/Edge; may fail in Firefox page console).
+    try {
+      var api = function () { goNext('manual', lastActiveVideo); };
+      api.probe = probe;
+      api.settings = function () { return CFG; };
+      api.profiles = BROWSER_PROFILES;
+      api.setBrowser = setBrowserOverride;
+      api.set = setSettingsOverride;
+      api.clear = clearOverrides;
       window.__xAutoNext = api;
       window.__xAutoNextProbe = probe;
     } catch (e) { /* ignore */ }
+
+    try {
+      document.documentElement.setAttribute('data-x-autonext', VERSION);
+    } catch (e2) { /* ignore */ }
+
+    log('commands: postMessage({source:"x-autonext",cmd:"next"|"probe"|"setBrowser"|"setSettings"|"clear"}, "*")');
   }
 
   // ---- Boot --------------------------------------------------------------
