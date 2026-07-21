@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X Desktop Video Auto Next
 // @namespace    http://tampermonkey.net/
-// @version      1.4.0
+// @version      1.5.0
 // @description  On X/Twitter desktop, when a video ends, play the next video instead of looping
 // @author       You
 // @match        https://x.com/*
@@ -16,8 +16,191 @@
   'use strict';
 
   var DEBUG = true;
-  var ADVANCE_COOLDOWN_MS = 2500;
-  var END_GUARD_MS = 150;
+
+  /**
+   * Per-browser tuning. Detected browser picks one profile at boot.
+   * Override any key via localStorage:
+   *   localStorage.setItem('xAutoNext.browser', 'chrome'|'firefox'|'edge'|'safari'|'opera'|'brave'|'other')
+   *   localStorage.setItem('xAutoNext.settings', JSON.stringify({ advanceCooldownMs: 3000 }))
+   */
+  var BROWSER_PROFILES = {
+    chrome: {
+      advanceCooldownMs: 2200,
+      endGuardMs: 140,
+      heartbeatMs: 900,
+      playNudgeDelayMs: 400,
+      playRetryDelayMs: 900,
+      openViewerHardNavDelayMs: 350,
+      scrollLoadDelayMs: 800,
+      minVideoWidth: 120,
+      preferViewerNavigation: true,
+      muteForAutoplay: true,
+      dispatchArrowDown: true,
+      usePointerEvents: true,
+      exportHelpersToPage: true,
+      notes: 'Chrome/Windows primary target. Mute before play() for autoplay policy.'
+    },
+    edge: {
+      advanceCooldownMs: 2200,
+      endGuardMs: 140,
+      heartbeatMs: 900,
+      playNudgeDelayMs: 400,
+      playRetryDelayMs: 900,
+      openViewerHardNavDelayMs: 350,
+      scrollLoadDelayMs: 800,
+      minVideoWidth: 120,
+      preferViewerNavigation: true,
+      muteForAutoplay: true,
+      dispatchArrowDown: true,
+      usePointerEvents: true,
+      exportHelpersToPage: true,
+      notes: 'Chromium Edge — same autoplay rules as Chrome.'
+    },
+    brave: {
+      advanceCooldownMs: 2400,
+      endGuardMs: 160,
+      heartbeatMs: 1000,
+      playNudgeDelayMs: 450,
+      playRetryDelayMs: 1000,
+      openViewerHardNavDelayMs: 400,
+      scrollLoadDelayMs: 850,
+      minVideoWidth: 120,
+      preferViewerNavigation: true,
+      muteForAutoplay: true,
+      dispatchArrowDown: true,
+      usePointerEvents: true,
+      exportHelpersToPage: true,
+      notes: 'Brave shields can delay media; slightly longer delays.'
+    },
+    opera: {
+      advanceCooldownMs: 2200,
+      endGuardMs: 140,
+      heartbeatMs: 900,
+      playNudgeDelayMs: 400,
+      playRetryDelayMs: 900,
+      openViewerHardNavDelayMs: 350,
+      scrollLoadDelayMs: 800,
+      minVideoWidth: 120,
+      preferViewerNavigation: true,
+      muteForAutoplay: true,
+      dispatchArrowDown: true,
+      usePointerEvents: true,
+      exportHelpersToPage: true,
+      notes: 'Opera Chromium build.'
+    },
+    firefox: {
+      advanceCooldownMs: 2600,
+      endGuardMs: 180,
+      heartbeatMs: 1100,
+      playNudgeDelayMs: 500,
+      playRetryDelayMs: 1100,
+      openViewerHardNavDelayMs: 450,
+      scrollLoadDelayMs: 900,
+      minVideoWidth: 120,
+      preferViewerNavigation: true,
+      muteForAutoplay: true,
+      dispatchArrowDown: true,
+      usePointerEvents: false,
+      exportHelpersToPage: true,
+      notes: 'Firefox needs unsafeWindow for console helpers; prefer .click() over PointerEvent.'
+    },
+    safari: {
+      advanceCooldownMs: 2800,
+      endGuardMs: 200,
+      heartbeatMs: 1200,
+      playNudgeDelayMs: 550,
+      playRetryDelayMs: 1200,
+      openViewerHardNavDelayMs: 500,
+      scrollLoadDelayMs: 1000,
+      minVideoWidth: 140,
+      preferViewerNavigation: true,
+      muteForAutoplay: true,
+      dispatchArrowDown: false,
+      usePointerEvents: false,
+      exportHelpersToPage: true,
+      notes: 'Safari autoplay is strict; rely more on viewer navigation + muted play.'
+    },
+    other: {
+      advanceCooldownMs: 2500,
+      endGuardMs: 160,
+      heartbeatMs: 1000,
+      playNudgeDelayMs: 450,
+      playRetryDelayMs: 1000,
+      openViewerHardNavDelayMs: 400,
+      scrollLoadDelayMs: 850,
+      minVideoWidth: 120,
+      preferViewerNavigation: true,
+      muteForAutoplay: true,
+      dispatchArrowDown: true,
+      usePointerEvents: true,
+      exportHelpersToPage: true,
+      notes: 'Generic fallback profile.'
+    }
+  };
+
+  function detectBrowserId() {
+    try {
+      var forced = localStorage.getItem('xAutoNext.browser');
+      if (forced && BROWSER_PROFILES[forced]) return forced;
+    } catch (err) {
+      // ignore
+    }
+
+    var ua = navigator.userAgent || '';
+    var brands =
+      (navigator.userAgentData && navigator.userAgentData.brands) || [];
+    var brandStr = brands
+      .map(function (b) {
+        return b.brand || '';
+      })
+      .join(' ')
+      .toLowerCase();
+
+    // Order matters (Edge/Opera/Brave include Chrome in UA).
+    if (/brave/i.test(ua) || brandStr.indexOf('brave') !== -1) return 'brave';
+    if (/edg\//i.test(ua) || brandStr.indexOf('microsoft edge') !== -1) return 'edge';
+    if (/opr\//i.test(ua) || /opera/i.test(ua)) return 'opera';
+    if (/firefox\//i.test(ua) || typeof InstallTrigger !== 'undefined') return 'firefox';
+    if (
+      /safari/i.test(ua) &&
+      !/chrome|chromium|crios|android/i.test(ua)
+    ) {
+      return 'safari';
+    }
+    if (/chrome|crios|chromium/i.test(ua) || brandStr.indexOf('chrome') !== -1) {
+      return 'chrome';
+    }
+    return 'other';
+  }
+
+  function loadSettings() {
+    var id = detectBrowserId();
+    var base = BROWSER_PROFILES[id] || BROWSER_PROFILES.other;
+    var settings = {};
+    var key;
+    for (key in base) {
+      if (Object.prototype.hasOwnProperty.call(base, key)) settings[key] = base[key];
+    }
+    settings.browserId = id;
+
+    try {
+      var raw = localStorage.getItem('xAutoNext.settings');
+      if (raw) {
+        var override = JSON.parse(raw);
+        for (key in override) {
+          if (Object.prototype.hasOwnProperty.call(override, key)) {
+            settings[key] = override[key];
+          }
+        }
+      }
+    } catch (err2) {
+      // ignore bad overrides
+    }
+    return settings;
+  }
+
+  var CFG = loadSettings();
+  var pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
   var attached = new WeakSet();
   var endTimers = new WeakMap();
@@ -26,8 +209,6 @@
   var lastActiveVideo = null;
   var lastAdvanceAt = 0;
   var lastAdvanceFromSrc = '';
-
-  var pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
   function log() {
     if (!DEBUG) return;
@@ -39,7 +220,7 @@
     window.clearTimeout(advanceUnlockTimer);
     advanceUnlockTimer = window.setTimeout(function () {
       advancing = false;
-    }, ADVANCE_COOLDOWN_MS);
+    }, CFG.advanceCooldownMs);
   }
 
   function isVideoEl(node) {
@@ -60,12 +241,46 @@
   function hardClick(el) {
     if (!el) return false;
     try {
+      if (CFG.usePointerEvents && typeof PointerEvent === 'function') {
+        el.dispatchEvent(
+          new PointerEvent('pointerdown', {
+            bubbles: true,
+            cancelable: true,
+            pointerType: 'mouse',
+            view: pageWindow
+          })
+        );
+      }
+      el.dispatchEvent(
+        new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: pageWindow })
+      );
+      if (CFG.usePointerEvents && typeof PointerEvent === 'function') {
+        el.dispatchEvent(
+          new PointerEvent('pointerup', {
+            bubbles: true,
+            cancelable: true,
+            pointerType: 'mouse',
+            view: pageWindow
+          })
+        );
+      }
+      el.dispatchEvent(
+        new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: pageWindow })
+      );
       el.dispatchEvent(
         new MouseEvent('click', { bubbles: true, cancelable: true, view: pageWindow })
       );
       if (typeof el.click === 'function') el.click();
       return true;
     } catch (err) {
+      try {
+        if (typeof el.click === 'function') {
+          el.click();
+          return true;
+        }
+      } catch (err2) {
+        // ignore
+      }
       return false;
     }
   }
@@ -73,7 +288,7 @@
   function isUsableVideo(video) {
     if (!isVideoEl(video) || !video.isConnected) return false;
     var rect = video.getBoundingClientRect();
-    if (rect.width < 120 || rect.height < 120) return false;
+    if (rect.width < CFG.minVideoWidth || rect.height < CFG.minVideoWidth) return false;
     return true;
   }
 
@@ -124,7 +339,6 @@
     }
   }
 
-  /** Build /status/{id}/video/1 URL for a timeline video card. */
   function statusVideoHref(video) {
     var box = containerFor(video);
     var existing = box.querySelector('a[href*="/status/"][href*="/video/"]');
@@ -162,6 +376,13 @@
 
   function playVideo(video) {
     disableLoop(video);
+    if (CFG.muteForAutoplay) {
+      try {
+        video.muted = true;
+      } catch (err) {
+        // ignore
+      }
+    }
     var box = containerFor(video);
     var player =
       box.querySelector('[data-testid="videoPlayer"]') ||
@@ -175,7 +396,7 @@
     try {
       var p = video.play();
       if (p && typeof p.catch === 'function') p.catch(function () {});
-    } catch (err) {
+    } catch (err2) {
       // ignore
     }
   }
@@ -192,19 +413,17 @@
       return true;
     }
 
-    // SPA-friendly navigation
     try {
       pageWindow.history.pushState({}, '', href);
       pageWindow.dispatchEvent(new PopStateEvent('popstate'));
     } catch (err) {
       // ignore
     }
-    // Fallback hard nav if still on same path shortly after
     window.setTimeout(function () {
       if (!/\/status\/\d+\/video\//.test(location.pathname)) {
         location.assign(href);
       }
-    }, 400);
+    }, CFG.openViewerHardNavDelayMs);
     return true;
   }
 
@@ -223,8 +442,7 @@
       }
     }
 
-    // Prefer X's dedicated video viewer — continuous Next video works there.
-    if (openInVideoViewer(next)) {
+    if (CFG.preferViewerNavigation && openInVideoViewer(next)) {
       lastActiveVideo = next;
       return;
     }
@@ -239,10 +457,10 @@
     window.setTimeout(function () {
       playVideo(next);
       lastActiveVideo = next;
-    }, 450);
+    }, CFG.playNudgeDelayMs);
     window.setTimeout(function () {
       if (next.isConnected && next.paused) playVideo(next);
-    }, 1000);
+    }, CFG.playRetryDelayMs);
   }
 
   function scrollToNextTimelineVideo(fromVideo) {
@@ -257,7 +475,7 @@
           log('still no next video after scroll');
           advancing = false;
         }
-      }, 850);
+      }, CFG.scrollLoadDelayMs);
       return;
     }
     activateTimelineVideo(next, fromVideo);
@@ -272,7 +490,7 @@
       log('skip goNext (cooldown)', reason);
       return;
     }
-    if (key && key === lastAdvanceFromSrc && now - lastAdvanceAt < ADVANCE_COOLDOWN_MS) {
+    if (key && key === lastAdvanceFromSrc && now - lastAdvanceAt < CFG.advanceCooldownMs) {
       log('skip goNext (same clip)', reason);
       return;
     }
@@ -284,6 +502,7 @@
 
     var viewerNext = findNextVideoButton();
     log('goNext', reason, {
+      browser: CFG.browserId,
       path: location.pathname,
       hasViewerNext: !!viewerNext,
       videos: listTimelineVideos().length
@@ -294,8 +513,7 @@
       return;
     }
 
-    // ArrowDown helps inside the immersive video player.
-    if (/\/status\/\d+/.test(location.pathname)) {
+    if (CFG.dispatchArrowDown && /\/status\/\d+/.test(location.pathname)) {
       try {
         document.body.dispatchEvent(
           new KeyboardEvent('keydown', {
@@ -322,13 +540,12 @@
     if (!isFinite(video.duration) || video.duration <= 0.5) return;
     if (video.paused) return;
 
-    var remainingMs = (video.duration - video.currentTime) * 1000 - END_GUARD_MS;
+    var remainingMs = (video.duration - video.currentTime) * 1000 - CFG.endGuardMs;
     if (remainingMs < 40) remainingMs = 40;
 
     var timer = window.setTimeout(function () {
       endTimers.delete(video);
       if (video.paused) return;
-      // Only the focused/on-screen active clip may advance.
       if (video !== lastActiveVideo && visibilityScore(video) < 0.5) return;
       var left = video.duration - video.currentTime;
       if (left > 0.55) {
@@ -450,25 +667,73 @@
     if (best) markPlaying(best, 'heartbeat');
   }
 
-  function boot() {
-    log('boot v1.4.0 — viewer + timeline mode', location.href);
-    scan();
-    new MutationObserver(scan).observe(document.documentElement, {
-      childList: true,
-      subtree: true
-    });
-    window.setInterval(heartbeat, 1000);
-  }
+  function exportHelpers() {
+    if (!CFG.exportHelpersToPage) return;
+    var api = {
+      next: function () {
+        goNext('manual', lastActiveVideo);
+      },
+      probe: probe,
+      settings: function () {
+        return CFG;
+      },
+      setBrowser: function (id) {
+        if (!BROWSER_PROFILES[id]) {
+          console.warn('[X-AutoNext] unknown browser id', id, Object.keys(BROWSER_PROFILES));
+          return false;
+        }
+        localStorage.setItem('xAutoNext.browser', id);
+        console.log('[X-AutoNext] browser override saved:', id, '— reload the page');
+        return true;
+      },
+      setSettings: function (partial) {
+        var current = {};
+        try {
+          current = JSON.parse(localStorage.getItem('xAutoNext.settings') || '{}');
+        } catch (err) {
+          current = {};
+        }
+        var key;
+        for (key in partial) {
+          if (Object.prototype.hasOwnProperty.call(partial, key)) current[key] = partial[key];
+        }
+        localStorage.setItem('xAutoNext.settings', JSON.stringify(current));
+        console.log('[X-AutoNext] settings override saved — reload the page', current);
+        return current;
+      },
+      clearOverrides: function () {
+        localStorage.removeItem('xAutoNext.browser');
+        localStorage.removeItem('xAutoNext.settings');
+        console.log('[X-AutoNext] overrides cleared — reload the page');
+      },
+      profiles: BROWSER_PROFILES
+    };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
+    pageWindow.__xAutoNext = api.next;
+    pageWindow.__xAutoNextProbe = api.probe;
+    pageWindow.__xAutoNextApi = api;
+    try {
+      window.__xAutoNext = api.next;
+      window.__xAutoNextProbe = api.probe;
+      window.__xAutoNextApi = api;
+    } catch (err2) {
+      // ignore sandbox
+    }
   }
 
   function probe() {
     var active = lastActiveVideo;
     var report = {
+      browser: CFG.browserId,
+      settings: {
+        advanceCooldownMs: CFG.advanceCooldownMs,
+        endGuardMs: CFG.endGuardMs,
+        preferViewerNavigation: CFG.preferViewerNavigation,
+        muteForAutoplay: CFG.muteForAutoplay,
+        usePointerEvents: CFG.usePointerEvents,
+        dispatchArrowDown: CFG.dispatchArrowDown
+      },
+      notes: CFG.notes,
       href: location.href,
       viewerNext: !!findNextVideoButton(),
       timelineVideos: listTimelineVideos().length,
@@ -480,8 +745,24 @@
     return report;
   }
 
-  pageWindow.__xAutoNext = function () {
-    goNext('manual', lastActiveVideo);
-  };
-  pageWindow.__xAutoNextProbe = probe;
+  function boot() {
+    log('boot v1.5.0', {
+      browser: CFG.browserId,
+      notes: CFG.notes,
+      href: location.href
+    });
+    exportHelpers();
+    scan();
+    new MutationObserver(scan).observe(document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+    window.setInterval(heartbeat, CFG.heartbeatMs);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
 })();
