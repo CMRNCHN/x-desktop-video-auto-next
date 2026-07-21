@@ -1,22 +1,22 @@
 // ==UserScript==
 // @name         X Desktop Video Auto Next
 // @namespace    http://tampermonkey.net/
-// @version      1.3.1
-// @description  On X/Twitter desktop, when a video ends, play the next timeline video instead of looping
+// @version      1.4.0
+// @description  On X/Twitter desktop, when a video ends, play the next video instead of looping
 // @author       You
 // @match        https://x.com/*
 // @match        https://twitter.com/*
 // @updateURL    https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/main/x-desktop-video-auto-next.user.js
 // @downloadURL  https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/main/x-desktop-video-auto-next.user.js
 // @run-at       document-idle
-// @grant        none
+// @grant        unsafeWindow
 // ==/UserScript==
 
 (function () {
   'use strict';
 
   var DEBUG = true;
-  var ADVANCE_COOLDOWN_MS = 2200;
+  var ADVANCE_COOLDOWN_MS = 2500;
   var END_GUARD_MS = 150;
 
   var attached = new WeakSet();
@@ -26,6 +26,8 @@
   var lastActiveVideo = null;
   var lastAdvanceAt = 0;
   var lastAdvanceFromSrc = '';
+
+  var pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
   function log() {
     if (!DEBUG) return;
@@ -58,7 +60,10 @@
   function hardClick(el) {
     if (!el) return false;
     try {
-      el.click();
+      el.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, view: pageWindow })
+      );
+      if (typeof el.click === 'function') el.click();
       return true;
     } catch (err) {
       return false;
@@ -119,12 +124,51 @@
     }
   }
 
+  /** Build /status/{id}/video/1 URL for a timeline video card. */
+  function statusVideoHref(video) {
+    var box = containerFor(video);
+    var existing = box.querySelector('a[href*="/status/"][href*="/video/"]');
+    if (existing) {
+      try {
+        return existing.href;
+      } catch (err) {
+        // ignore
+      }
+    }
+    var anchors = box.querySelectorAll('a[href*="/status/"]');
+    for (var i = 0; i < anchors.length; i++) {
+      var href = anchors[i].getAttribute('href') || '';
+      var m = href.match(/^(\/[^/?#]+\/status\/\d+)/);
+      if (m) return location.origin + m[1] + '/video/1';
+    }
+    return null;
+  }
+
+  function findNextTimelineVideo(fromVideo) {
+    var videos = listTimelineVideos();
+    var idx = fromVideo ? videos.indexOf(fromVideo) : -1;
+    if (idx >= 0 && idx < videos.length - 1) return videos[idx + 1];
+
+    var fromTop = fromVideo
+      ? fromVideo.getBoundingClientRect().top + window.scrollY
+      : window.scrollY;
+    for (var i = 0; i < videos.length; i++) {
+      if (videos[i] === fromVideo) continue;
+      var top = videos[i].getBoundingClientRect().top + window.scrollY;
+      if (top > fromTop + 80) return videos[i];
+    }
+    return null;
+  }
+
   function playVideo(video) {
     disableLoop(video);
     var box = containerFor(video);
-    hardClick(video);
+    var player =
+      box.querySelector('[data-testid="videoPlayer"]') ||
+      box.querySelector('[data-testid="videoComponent"]') ||
+      video;
+    hardClick(player);
     var playBtn =
-      box.querySelector('[data-testid="play"]') ||
       box.querySelector('[aria-label="Play"]') ||
       box.querySelector('[aria-label="Play video"]');
     if (playBtn) hardClick(playBtn);
@@ -134,6 +178,34 @@
     } catch (err) {
       // ignore
     }
+  }
+
+  function openInVideoViewer(video) {
+    var href = statusVideoHref(video);
+    log('open viewer', href);
+    if (!href) return false;
+
+    var box = containerFor(video);
+    var link = box.querySelector('a[href*="/status/"][href*="/video/"]');
+    if (link) {
+      hardClick(link);
+      return true;
+    }
+
+    // SPA-friendly navigation
+    try {
+      pageWindow.history.pushState({}, '', href);
+      pageWindow.dispatchEvent(new PopStateEvent('popstate'));
+    } catch (err) {
+      // ignore
+    }
+    // Fallback hard nav if still on same path shortly after
+    window.setTimeout(function () {
+      if (!/\/status\/\d+\/video\//.test(location.pathname)) {
+        location.assign(href);
+      }
+    }, 400);
+    return true;
   }
 
   function activateTimelineVideo(next, fromVideo) {
@@ -151,6 +223,12 @@
       }
     }
 
+    // Prefer X's dedicated video viewer — continuous Next video works there.
+    if (openInVideoViewer(next)) {
+      lastActiveVideo = next;
+      return;
+    }
+
     var box = containerFor(next);
     try {
       box.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
@@ -161,62 +239,27 @@
     window.setTimeout(function () {
       playVideo(next);
       lastActiveVideo = next;
-    }, 400);
+    }, 450);
     window.setTimeout(function () {
-      if (next.paused) playVideo(next);
-    }, 900);
+      if (next.isConnected && next.paused) playVideo(next);
+    }, 1000);
   }
 
   function scrollToNextTimelineVideo(fromVideo) {
-    var videos = listTimelineVideos();
-    var idx = fromVideo ? videos.indexOf(fromVideo) : -1;
-    var next = null;
-
-    if (idx >= 0 && idx < videos.length - 1) {
-      next = videos[idx + 1];
-    } else {
-      var fromTop = fromVideo
-        ? fromVideo.getBoundingClientRect().top + window.scrollY
-        : window.scrollY;
-      for (var i = 0; i < videos.length; i++) {
-        var top = videos[i].getBoundingClientRect().top + window.scrollY;
-        if (videos[i] !== fromVideo && top > fromTop + 80) {
-          next = videos[i];
-          break;
-        }
-      }
-    }
-
+    var next = findNextTimelineVideo(fromVideo);
     if (!next) {
       log('no next video in DOM — scrolling to load more');
       window.scrollBy(0, Math.max(window.innerHeight * 0.9, 700));
       window.setTimeout(function () {
-        var again = listTimelineVideos();
-        var fromIdx = fromVideo ? again.indexOf(fromVideo) : -1;
-        var candidate =
-          fromIdx >= 0 && fromIdx < again.length - 1 ? again[fromIdx + 1] : null;
-        if (!candidate) {
-          for (var j = 0; j < again.length; j++) {
-            if (again[j] === fromVideo) continue;
-            var t = again[j].getBoundingClientRect().top + window.scrollY;
-            var ft = fromVideo
-              ? fromVideo.getBoundingClientRect().top + window.scrollY
-              : 0;
-            if (t > ft + 80) {
-              candidate = again[j];
-              break;
-            }
-          }
-        }
+        var candidate = findNextTimelineVideo(fromVideo);
         if (candidate) activateTimelineVideo(candidate, fromVideo);
         else {
           log('still no next video after scroll');
           advancing = false;
         }
-      }, 800);
+      }, 850);
       return;
     }
-
     activateTimelineVideo(next, fromVideo);
   }
 
@@ -251,6 +294,26 @@
       return;
     }
 
+    // ArrowDown helps inside the immersive video player.
+    if (/\/status\/\d+/.test(location.pathname)) {
+      try {
+        document.body.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'ArrowDown',
+            code: 'ArrowDown',
+            keyCode: 40,
+            which: 40,
+            bubbles: true,
+            cancelable: true,
+            view: pageWindow
+          })
+        );
+        log('dispatched ArrowDown');
+      } catch (err) {
+        // ignore
+      }
+    }
+
     scrollToNextTimelineVideo(source);
   }
 
@@ -265,7 +328,8 @@
     var timer = window.setTimeout(function () {
       endTimers.delete(video);
       if (video.paused) return;
-      if (visibilityScore(video) < 0.25 && video !== lastActiveVideo) return;
+      // Only the focused/on-screen active clip may advance.
+      if (video !== lastActiveVideo && visibilityScore(video) < 0.5) return;
       var left = video.duration - video.currentTime;
       if (left > 0.55) {
         armEndTimer(video);
@@ -288,7 +352,7 @@
     if (lastActiveVideo !== video) {
       log('playing', why, {
         duration: video.duration,
-        t: video.currentTime,
+        t: Math.round(video.currentTime * 100) / 100,
         vis: Math.round(visibilityScore(video) * 100) + '%'
       });
     }
@@ -331,14 +395,13 @@
     });
     video.addEventListener('ended', function () {
       clearEndTimer(video);
-      goNext('ended', video);
+      if (video === lastActiveVideo || visibilityScore(video) >= 0.5) {
+        goNext('ended', video);
+      }
     });
 
     video.addEventListener('timeupdate', function () {
-      if (!isFinite(video.duration) || video.duration < 1) return;
-      if (video.paused) return;
-
-      // HLS often skips a clean play event — treat timeupdate as proof of playback.
+      if (!isFinite(video.duration) || video.duration < 1 || video.paused) return;
       if (video.currentTime > 0.05) markPlaying(video, 'timeupdate');
 
       var remaining = video.duration - video.currentTime;
@@ -348,6 +411,7 @@
       }
       if (nearEnd && video.currentTime < 0.45) {
         nearEnd = false;
+        if (video !== lastActiveVideo && visibilityScore(video) < 0.5) return;
         log('loop-restart');
         try {
           video.pause();
@@ -364,11 +428,10 @@
   }
 
   function scan() {
-    var videos = document.querySelectorAll('video');
-    for (var i = 0; i < videos.length; i++) attachVideo(videos[i]);
+    var nodes = document.querySelectorAll('video');
+    for (var i = 0; i < nodes.length; i++) attachVideo(nodes[i]);
   }
 
-  // Catch players that start without firing play/playing reliably.
   function heartbeat() {
     scan();
     var videos = listTimelineVideos();
@@ -388,7 +451,7 @@
   }
 
   function boot() {
-    log('boot v1.3.1 — timeline scroll mode', location.href);
+    log('boot v1.4.0 — viewer + timeline mode', location.href);
     scan();
     new MutationObserver(scan).observe(document.documentElement, {
       childList: true,
@@ -404,28 +467,21 @@
   }
 
   function probe() {
-    var vids = listTimelineVideos().map(function (v) {
-      return {
-        paused: v.paused,
-        t: Math.round(v.currentTime * 10) / 10,
-        d: isFinite(v.duration) ? Math.round(v.duration * 10) / 10 : null,
-        vis: Math.round(visibilityScore(v) * 100)
-      };
-    });
+    var active = lastActiveVideo;
     var report = {
       href: location.href,
       viewerNext: !!findNextVideoButton(),
-      timelineVideos: vids.length,
-      lastActive: !!(lastActiveVideo && lastActiveVideo.isConnected),
-      advancing: advancing,
-      vids: vids
+      timelineVideos: listTimelineVideos().length,
+      lastActive: !!(active && active.isConnected),
+      nextHref: active ? statusVideoHref(findNextTimelineVideo(active) || active) : null,
+      advancing: advancing
     };
     console.log('[X-AutoNext] probe', report);
     return report;
   }
 
-  window.__xAutoNext = function () {
+  pageWindow.__xAutoNext = function () {
     goNext('manual', lastActiveVideo);
   };
-  window.__xAutoNextProbe = probe;
+  pageWindow.__xAutoNextProbe = probe;
 })();
