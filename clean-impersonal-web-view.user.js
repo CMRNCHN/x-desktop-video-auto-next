@@ -1,10 +1,14 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View
-// @version     3.1.0
+// @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
+// @version     3.2.1
 // @description Strips branding and restyles pages to a muted generic look; swaps media for a curated stock set so sites still read like ordinary websites.
 // @author      Senior Engineer
 // @match       http://*/*
 // @match       https://*/*
+// @updateURL   https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/cursor/modern-impersonal-web-view/clean-impersonal-web-view.user.js
+// @downloadURL https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/cursor/modern-impersonal-web-view/clean-impersonal-web-view.user.js
+// @homepageURL https://github.com/CMRNCHN/x-desktop-video-auto-next/tree/cursor/modern-impersonal-web-view
 // @run-at      document-start
 // @grant       none
 // ==/UserScript==
@@ -16,8 +20,24 @@
     const FONT_ID = 'impersonal-theme-font';
     const MARK = 'data-impersonal-media';
     const NUM_CLASS = 'impersonal-num';
-    const TEXT = '#5c5954';
-    const NUM = '#7d8b86';
+    const PANEL_ID = 'impersonal-controls';
+    const STORAGE_KEY = 'impersonal-view-settings-v1';
+
+    const BASE_TEXT = '#5c5954';
+    const BASE_MUTED = '#8a8580';
+    const BASE_NUM = '#7d8b86';
+    const BASE_ACCENT = '#7a8580';
+
+    const DEFAULTS = {
+        siteBrightness: 100,
+        siteContrast: 100,
+        fontBrightness: 100,
+        fontContrast: 100,
+    };
+
+    let settings = loadSettings();
+    let TEXT = BASE_TEXT;
+    let NUM = BASE_NUM;
 
     // Curated stock photos: office, city, nature, product, lifestyle
     const STOCK_PHOTOS = [
@@ -103,6 +123,100 @@
         return list[hashString(key) % list.length];
     }
 
+    function clamp(n, min, max) {
+        return Math.min(max, Math.max(min, n));
+    }
+
+    function loadSettings() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return Object.assign({}, DEFAULTS);
+            const parsed = JSON.parse(raw);
+            return {
+                siteBrightness: clamp(Number(parsed.siteBrightness) || DEFAULTS.siteBrightness, 50, 150),
+                siteContrast: clamp(Number(parsed.siteContrast) || DEFAULTS.siteContrast, 50, 150),
+                fontBrightness: clamp(Number(parsed.fontBrightness) || DEFAULTS.fontBrightness, 50, 150),
+                fontContrast: clamp(Number(parsed.fontContrast) || DEFAULTS.fontContrast, 50, 150),
+            };
+        } catch (err) {
+            return Object.assign({}, DEFAULTS);
+        }
+    }
+
+    function saveSettings() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        } catch (err) {
+            // private mode / blocked storage
+        }
+    }
+
+    function hexToRgb(hex) {
+        const h = String(hex).replace('#', '');
+        return {
+            r: parseInt(h.slice(0, 2), 16),
+            g: parseInt(h.slice(2, 4), 16),
+            b: parseInt(h.slice(4, 6), 16),
+        };
+    }
+
+    function rgbToHex(r, g, b) {
+        return (
+            '#' +
+            [r, g, b]
+                .map(function (v) {
+                    return clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0');
+                })
+                .join('')
+        );
+    }
+
+    function adjustTone(hex, brightnessPct, contrastPct) {
+        const rgb = hexToRgb(hex);
+        const br = brightnessPct / 100;
+        let r = rgb.r * br;
+        let g = rgb.g * br;
+        let b = rgb.b * br;
+        const mid = 128;
+        const c = contrastPct / 100;
+        r = mid + (r - mid) * c;
+        g = mid + (g - mid) * c;
+        b = mid + (b - mid) * c;
+        return rgbToHex(r, g, b);
+    }
+
+    function deriveFontColors() {
+        // Higher font brightness => darker ink on the light page (easier to read)
+        const inkBrightness = clamp(200 - settings.fontBrightness, 50, 150);
+        TEXT = adjustTone(BASE_TEXT, inkBrightness, settings.fontContrast);
+        NUM = adjustTone(BASE_NUM, inkBrightness, settings.fontContrast);
+        return {
+            text: TEXT,
+            muted: adjustTone(BASE_MUTED, inkBrightness, settings.fontContrast),
+            num: NUM,
+            accent: adjustTone(BASE_ACCENT, inkBrightness, settings.fontContrast),
+        };
+    }
+
+    function applyVisualSettings() {
+        const colors = deriveFontColors();
+        const root = document.documentElement;
+        if (!root) return;
+
+        const inkBrightness = clamp(200 - settings.fontBrightness, 50, 150);
+        root.style.setProperty('--text', colors.text, 'important');
+        root.style.setProperty('--text-muted', colors.muted, 'important');
+        root.style.setProperty('--num', colors.num, 'important');
+        root.style.setProperty('--accent', colors.accent, 'important');
+        root.style.setProperty('--accent-hover', adjustTone(BASE_ACCENT, inkBrightness * 0.9, settings.fontContrast), 'important');
+
+        if (document.body) {
+            const b = (settings.siteBrightness / 100).toFixed(3);
+            const c = (settings.siteContrast / 100).toFixed(3);
+            document.body.style.setProperty('filter', 'brightness(' + b + ') contrast(' + c + ')', 'important');
+        }
+    }
+
     function injectFont() {
         if (document.getElementById(FONT_ID)) return;
         if (!document.documentElement) return;
@@ -123,23 +237,29 @@
             (document.head || document.documentElement).appendChild(style);
         }
 
+        const colors = deriveFontColors();
+        const inkBrightness = clamp(200 - settings.fontBrightness, 50, 150);
+
         style.textContent = [
             ':root {',
             '  --bg: #e8e5e0 !important;',
             '  --surface: #f0eeea !important;',
             '  --surface-muted: #e2dfd9 !important;',
-            '  --text: ' + TEXT + ' !important;',
-            '  --text-muted: #8a8580 !important;',
-            '  --num: ' + NUM + ' !important;',
+            '  --text: ' + colors.text + ' !important;',
+            '  --text-muted: ' + colors.muted + ' !important;',
+            '  --num: ' + colors.num + ' !important;',
             '  --border: #d2cec7 !important;',
-            '  --accent: #7a8580 !important;',
-            '  --accent-hover: #636c68 !important;',
+            '  --accent: ' + colors.accent + ' !important;',
+            '  --accent-hover: ' + adjustTone(BASE_ACCENT, inkBrightness * 0.9, settings.fontContrast) + ' !important;',
             '  --accent-soft: #d8ddd9 !important;',
             '  --shadow: none !important;',
             '  --radius: 10px !important;',
             '  --radius-sm: 6px !important;',
             '  --font: "Plus Jakarta Sans", "Segoe UI", sans-serif !important;',
             '  --font-mono: "IBM Plex Mono", ui-monospace, monospace !important;',
+            '}',
+            'html {',
+            '  background: var(--bg) !important;',
             '}',
             'html, body {',
             '  background: var(--bg) !important;',
@@ -149,117 +269,117 @@
             '  line-height: 1.55 !important;',
             '  -webkit-font-smoothing: antialiased !important;',
             '}',
-            '*, *::before, *::after {',
+            'body, body *, body *::before, body *::after {',
             '  font-family: inherit !important;',
             '  color: var(--text) !important;',
             '  text-shadow: none !important;',
             '  caret-color: var(--text) !important;',
             '  scrollbar-color: #b0aaa3 var(--surface-muted) !important;',
             '}',
-            'div, section, article, main, header, footer, aside, nav,',
-            'ul, ol, li, p, span, label, td, th, small, strong, em, b, i,',
-            'h1, h2, h3, h4, h5, h6, figcaption, blockquote, time, cite {',
+            'body div, body section, body article, body main, body header, body footer, body aside, body nav,',
+            'body ul, body ol, body li, body p, body span, body label, body td, body th, body small, body strong, body em, body b, body i,',
+            'body h1, body h2, body h3, body h4, body h5, body h6, body figcaption, body blockquote, body time, body cite {',
             '  color: var(--text) !important;',
             '  background-image: none !important;',
             '}',
-            'h1, h2, h3, h4, h5, h6 {',
+            'body h1, body h2, body h3, body h4, body h5, body h6 {',
             '  font-family: var(--font) !important;',
             '  font-weight: 600 !important;',
             '  letter-spacing: -0.01em !important;',
             '  line-height: 1.3 !important;',
             '  color: var(--text) !important;',
             '}',
-            '.' + NUM_CLASS + ',',
-            '.' + NUM_CLASS + ' * {',
+            'body .' + NUM_CLASS + ',',
+            'body .' + NUM_CLASS + ' * {',
             '  color: var(--num) !important;',
             '  font-variant-numeric: tabular-nums !important;',
             '}',
-            'header, footer, nav, [role="banner"], [role="navigation"],',
-            '[class*="header" i], [id*="header" i],',
-            '[class*="nav" i], [id*="nav" i],',
-            '[class*="toolbar" i], [class*="sidebar" i], [class*="aside" i] {',
+            'body header, body footer, body nav, body [role="banner"], body [role="navigation"],',
+            'body [class*="header" i], body [id*="header" i],',
+            'body [class*="nav" i], body [id*="nav" i],',
+            'body [class*="toolbar" i], body [class*="sidebar" i], body [class*="aside" i] {',
             '  background-color: var(--surface) !important;',
             '  background-image: none !important;',
             '  border-color: var(--border) !important;',
             '  box-shadow: none !important;',
             '  color: var(--text) !important;',
             '}',
-            'main, article, [role="main"],',
-            '[class*="card" i], [class*="panel" i], [class*="modal" i],',
-            '[class*="dialog" i], [class*="popover" i], [class*="dropdown" i] {',
+            'body main, body article, body [role="main"],',
+            'body [class*="card" i], body [class*="panel" i], body [class*="modal" i],',
+            'body [class*="dialog" i], body [class*="popover" i], body [class*="dropdown" i] {',
             '  background-color: var(--surface) !important;',
             '  border-color: var(--border) !important;',
             '  border-radius: var(--radius) !important;',
             '  box-shadow: none !important;',
             '  color: var(--text) !important;',
             '}',
-            '[style*="gradient"],',
-            '[class*="gradient" i],',
-            '[class*="glow" i],',
-            '[class*="neon" i] {',
+            'body [style*="gradient"],',
+            'body [class*="gradient" i],',
+            'body [class*="glow" i],',
+            'body [class*="neon" i] {',
             '  background-image: none !important;',
             '  box-shadow: none !important;',
             '  filter: none !important;',
             '}',
-            'img, picture, video, canvas, embed, object, iframe {',
+            'body img, body picture, body video, body canvas, body embed, body object, body iframe {',
             '  opacity: 0.78 !important;',
             '  visibility: visible !important;',
             '  filter: saturate(0.4) brightness(0.94) contrast(0.92) !important;',
             '  border-radius: var(--radius-sm) !important;',
             '  object-fit: cover !important;',
             '}',
-            'img[' + MARK + '], video[' + MARK + '] {',
+            'body img[' + MARK + '], body video[' + MARK + '] {',
             '  background: var(--surface-muted) !important;',
             '}',
-            LOGO_SELECTORS + ' {',
+            LOGO_SELECTORS.split(', ').map(function (s) { return 'body ' + s; }).join(', ') + ' {',
             '  opacity: 0.7 !important;',
             '  visibility: visible !important;',
             '  filter: saturate(0.2) brightness(0.95) !important;',
             '}',
-            'svg { color: var(--text-muted) !important; fill: currentColor; }',
-            '[class*="promo" i],',
-            '[class*="advert" i],',
-            '[class*="sponsor" i],',
-            '[class*="mascot" i],',
-            '[class*="confetti" i],',
-            '[id*="cookie" i],',
-            '[class*="cookie" i],',
-            '[class*="consent" i] {',
+            'body svg { color: var(--text-muted) !important; fill: currentColor; }',
+            'body [class*="promo" i],',
+            'body [class*="advert" i],',
+            'body [class*="sponsor" i],',
+            'body [class*="mascot" i],',
+            'body [class*="confetti" i],',
+            'body [id*="cookie" i],',
+            'body [class*="cookie" i],',
+            'body [class*="consent" i] {',
             '  opacity: 0 !important;',
             '  visibility: hidden !important;',
             '  pointer-events: none !important;',
             '  max-height: 0 !important;',
             '  overflow: hidden !important;',
             '}',
-            'a {',
+            'body a {',
             '  color: var(--accent) !important;',
             '  text-decoration: none !important;',
             '  font-weight: 500 !important;',
             '  background-image: none !important;',
             '}',
-            'a:hover {',
+            'body a:hover {',
             '  color: var(--accent-hover) !important;',
             '  text-decoration: underline !important;',
             '}',
-            'nav a, header a, [role="navigation"] a {',
+            'body nav a, body header a, body [role="navigation"] a {',
             '  color: var(--text) !important;',
             '  font-weight: 500 !important;',
             '  text-decoration: none !important;',
             '  padding: 6px 10px !important;',
             '  border-radius: 6px !important;',
             '}',
-            'nav a:hover, header a:hover, [role="navigation"] a:hover {',
+            'body nav a:hover, body header a:hover, body [role="navigation"] a:hover {',
             '  background-color: var(--surface-muted) !important;',
             '  color: var(--text) !important;',
             '  text-decoration: none !important;',
             '}',
-            'button,',
-            'input[type="button"],',
-            'input[type="submit"],',
-            'input[type="reset"],',
-            '[role="button"],',
-            '[class*="btn" i],',
-            '[class*="button" i] {',
+            'body button,',
+            'body input[type="button"],',
+            'body input[type="submit"],',
+            'body input[type="reset"],',
+            'body [role="button"],',
+            'body [class*="btn" i],',
+            'body [class*="button" i] {',
             '  background: var(--surface-muted) !important;',
             '  color: var(--text) !important;',
             '  border: 1px solid var(--border) !important;',
@@ -268,19 +388,19 @@
             '  font-family: var(--font) !important;',
             '  box-shadow: none !important;',
             '}',
-            'button:hover,',
-            'input[type="button"]:hover,',
-            'input[type="submit"]:hover,',
-            '[role="button"]:hover,',
-            '[class*="btn" i]:hover {',
+            'body button:hover,',
+            'body input[type="button"]:hover,',
+            'body input[type="submit"]:hover,',
+            'body [role="button"]:hover,',
+            'body [class*="btn" i]:hover {',
             '  background: var(--border) !important;',
             '  border-color: var(--text-muted) !important;',
             '  color: var(--text) !important;',
             '}',
-            'button *, [role="button"] *, [class*="btn" i] *, [class*="button" i] * {',
+            'body button *, body [role="button"] *, body [class*="btn" i] *, body [class*="button" i] * {',
             '  color: var(--text) !important;',
             '}',
-            'input, textarea, select {',
+            'body input, body textarea, body select {',
             '  background: var(--surface) !important;',
             '  color: var(--text) !important;',
             '  border: 1px solid var(--border) !important;',
@@ -289,23 +409,23 @@
             '  box-shadow: none !important;',
             '  padding: 8px 12px !important;',
             '}',
-            'input:focus, textarea:focus, select:focus {',
+            'body input:focus, body textarea:focus, body select:focus {',
             '  border-color: var(--accent) !important;',
             '  outline: 2px solid var(--accent-soft) !important;',
             '  box-shadow: none !important;',
             '}',
-            '::placeholder { color: var(--text-muted) !important; opacity: 1 !important; }',
-            'table { border-collapse: separate !important; border-spacing: 0 !important; width: 100% !important; }',
-            'th, td { border: 1px solid var(--border) !important; padding: 10px 14px !important; color: var(--text) !important; }',
-            'th { background: var(--surface-muted) !important; font-weight: 600 !important; }',
-            'code, pre, kbd, samp {',
+            'body ::placeholder { color: var(--text-muted) !important; opacity: 1 !important; }',
+            'body table { border-collapse: separate !important; border-spacing: 0 !important; width: 100% !important; }',
+            'body th, body td { border: 1px solid var(--border) !important; padding: 10px 14px !important; color: var(--text) !important; }',
+            'body th { background: var(--surface-muted) !important; font-weight: 600 !important; }',
+            'body code, body pre, body kbd, body samp {',
             '  font-family: var(--font-mono) !important;',
             '  background: var(--surface-muted) !important;',
             '  color: var(--text) !important;',
             '  border: 1px solid var(--border) !important;',
             '  border-radius: 6px !important;',
             '}',
-            'blockquote {',
+            'body blockquote {',
             '  border-left: 3px solid var(--border) !important;',
             '  background: var(--surface-muted) !important;',
             '  color: var(--text-muted) !important;',
@@ -313,8 +433,179 @@
             '  margin: 16px 0 !important;',
             '  border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important;',
             '}',
-            '::selection { background: var(--accent-soft) !important; color: var(--text) !important; }',
+            'body ::selection { background: var(--accent-soft) !important; color: var(--text) !important; }',
+            '#' + PANEL_ID + ' {',
+            '  all: initial;',
+            '  position: fixed !important;',
+            '  right: 16px !important;',
+            '  bottom: 16px !important;',
+            '  z-index: 2147483646 !important;',
+            '  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif !important;',
+            '  color: #5c5954 !important;',
+            '}',
+            '#' + PANEL_ID + ' * {',
+            '  box-sizing: border-box !important;',
+            '  font-family: inherit !important;',
+            '  color: inherit !important;',
+            '}',
+            '#' + PANEL_ID + ' .imp-toggle {',
+            '  display: inline-flex !important;',
+            '  align-items: center !important;',
+            '  justify-content: center !important;',
+            '  width: 40px !important;',
+            '  height: 40px !important;',
+            '  border-radius: 999px !important;',
+            '  border: 1px solid #d2cec7 !important;',
+            '  background: #f0eeea !important;',
+            '  color: #5c5954 !important;',
+            '  cursor: pointer !important;',
+            '  box-shadow: 0 8px 24px rgba(40, 36, 30, 0.12) !important;',
+            '  font-size: 13px !important;',
+            '  font-weight: 600 !important;',
+            '}',
+            '#' + PANEL_ID + ' .imp-panel {',
+            '  display: none !important;',
+            '  width: 240px !important;',
+            '  margin-bottom: 10px !important;',
+            '  padding: 14px !important;',
+            '  border-radius: 12px !important;',
+            '  border: 1px solid #d2cec7 !important;',
+            '  background: #f0eeea !important;',
+            '  box-shadow: 0 12px 32px rgba(40, 36, 30, 0.14) !important;',
+            '}',
+            '#' + PANEL_ID + '.imp-open .imp-panel { display: block !important; }',
+            '#' + PANEL_ID + ' .imp-title {',
+            '  font-size: 12px !important;',
+            '  font-weight: 650 !important;',
+            '  letter-spacing: 0.04em !important;',
+            '  text-transform: uppercase !important;',
+            '  color: #8a8580 !important;',
+            '  margin: 0 0 12px !important;',
+            '}',
+            '#' + PANEL_ID + ' .imp-row {',
+            '  display: grid !important;',
+            '  grid-template-columns: 1fr auto !important;',
+            '  gap: 4px 8px !important;',
+            '  align-items: center !important;',
+            '  margin: 0 0 10px !important;',
+            '}',
+            '#' + PANEL_ID + ' .imp-row label {',
+            '  font-size: 12px !important;',
+            '  color: #5c5954 !important;',
+            '}',
+            '#' + PANEL_ID + ' .imp-row output {',
+            '  font-size: 11px !important;',
+            '  color: #8a8580 !important;',
+            '  font-variant-numeric: tabular-nums !important;',
+            '}',
+            '#' + PANEL_ID + ' .imp-row input[type="range"] {',
+            '  grid-column: 1 / -1 !important;',
+            '  width: 100% !important;',
+            '  margin: 0 !important;',
+            '  accent-color: #7a8580 !important;',
+            '}',
+            '#' + PANEL_ID + ' .imp-actions {',
+            '  display: flex !important;',
+            '  justify-content: flex-end !important;',
+            '  margin-top: 4px !important;',
+            '}',
+            '#' + PANEL_ID + ' .imp-reset {',
+            '  border: 1px solid #d2cec7 !important;',
+            '  background: #e2dfd9 !important;',
+            '  color: #5c5954 !important;',
+            '  border-radius: 6px !important;',
+            '  padding: 6px 10px !important;',
+            '  font-size: 12px !important;',
+            '  cursor: pointer !important;',
+            '}',
         ].join('\n');
+    }
+
+    function ensureSettingsPanel() {
+        if (!document.documentElement) return;
+        let root = document.getElementById(PANEL_ID);
+        if (root) {
+            syncPanelInputs(root);
+            return;
+        }
+
+        root = document.createElement('div');
+        root.id = PANEL_ID;
+        root.setAttribute(MARK, 'ui');
+
+        const panel = document.createElement('div');
+        panel.className = 'imp-panel';
+        panel.innerHTML = [
+            '<p class="imp-title">Display</p>',
+            sliderHtml('siteBrightness', 'Site brightness'),
+            sliderHtml('siteContrast', 'Site contrast'),
+            sliderHtml('fontBrightness', 'Font brightness'),
+            sliderHtml('fontContrast', 'Font contrast'),
+            '<div class="imp-actions"><button type="button" class="imp-reset">Reset</button></div>',
+        ].join('');
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'imp-toggle';
+        toggle.setAttribute('aria-label', 'Display settings');
+        toggle.textContent = 'Aa';
+
+        root.appendChild(panel);
+        root.appendChild(toggle);
+        document.documentElement.appendChild(root);
+
+        toggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            root.classList.toggle('imp-open');
+        });
+
+        panel.addEventListener('input', function (e) {
+            const t = e.target;
+            if (!t || t.tagName !== 'INPUT' || t.type !== 'range') return;
+            const key = t.getAttribute('data-key');
+            if (!key || !(key in settings)) return;
+            settings[key] = clamp(Number(t.value), 50, 150);
+            const out = t.parentElement && t.parentElement.querySelector('output');
+            if (out) out.textContent = String(settings[key]);
+            saveSettings();
+            applyVisualSettings();
+            blankInlineBrandStyles(document);
+        });
+
+        panel.querySelector('.imp-reset').addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            settings = Object.assign({}, DEFAULTS);
+            saveSettings();
+            syncPanelInputs(root);
+            applyVisualSettings();
+            blankInlineBrandStyles(document);
+        });
+
+        syncPanelInputs(root);
+    }
+
+    function sliderHtml(key, label) {
+        const val = settings[key];
+        return [
+            '<div class="imp-row">',
+            '<label for="imp-' + key + '">' + label + '</label>',
+            '<output for="imp-' + key + '">' + val + '</output>',
+            '<input id="imp-' + key + '" data-key="' + key + '" type="range" min="50" max="150" step="1" value="' + val + '" />',
+            '</div>',
+        ].join('');
+    }
+
+    function syncPanelInputs(root) {
+        if (!root) return;
+        Object.keys(DEFAULTS).forEach(function (key) {
+            const input = root.querySelector('input[data-key="' + key + '"]');
+            if (!input) return;
+            input.value = String(settings[key]);
+            const out = input.parentElement && input.parentElement.querySelector('output');
+            if (out) out.textContent = String(settings[key]);
+        });
     }
 
     function isOurUrl(url) {
@@ -499,6 +790,7 @@
         const nodes = scope.querySelectorAll ? scope.querySelectorAll('[style]') : [];
 
         nodes.forEach((el) => {
+            if (el.closest && el.closest('#' + PANEL_ID)) return;
             if (el.style.boxShadow && /rgb|#|hsl/i.test(el.style.boxShadow)) {
                 // Keep layout quiet; drop neon brand shadows
                 if (/0px|rgba\(0,\s*0,\s*0/i.test(el.style.boxShadow) === false) {
@@ -522,7 +814,7 @@
         const scope = root && root.nodeType ? root : document.body;
         if (!scope || !document.createTreeWalker) return;
 
-        const skip = 'script, style, noscript, textarea, input, select, option, code, pre, kbd, samp, .' + NUM_CLASS;
+        const skip = 'script, style, noscript, textarea, input, select, option, code, pre, kbd, samp, #' + PANEL_ID + ', .' + NUM_CLASS;
         const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
             acceptNode: function (node) {
                 if (!node.nodeValue || !/\d/.test(node.nodeValue)) {
@@ -586,6 +878,8 @@
     function applyTheme(root) {
         injectFont();
         injectStyles();
+        applyVisualSettings();
+        ensureSettingsPanel();
         blankInlineBrandStyles(root || document);
         replaceMedia(root || document);
         tintNumbers((root && root.body) || root || document.body || document.documentElement);
@@ -636,9 +930,19 @@
         const observer = new MutationObserver((mutations) => {
             let touched = false;
             for (const mutation of mutations) {
+                const t = mutation.target;
+                if (t && t.closest && t.closest('#' + PANEL_ID)) continue;
                 if (mutation.addedNodes && mutation.addedNodes.length) {
-                    touched = true;
-                    break;
+                    let onlyPanel = true;
+                    mutation.addedNodes.forEach(function (n) {
+                        if (n.id === PANEL_ID) return;
+                        if (n.nodeType === 1 && n.closest && n.closest('#' + PANEL_ID)) return;
+                        onlyPanel = false;
+                    });
+                    if (!onlyPanel) {
+                        touched = true;
+                        break;
+                    }
                 }
                 if (
                     mutation.type === 'attributes' &&
