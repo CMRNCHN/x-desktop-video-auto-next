@@ -6,9 +6,9 @@
 // @author      Senior Engineer
 // @match       http://*/*
 // @match       https://*/*
-// @updateURL   https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/cursor/modern-impersonal-web-view/clean-impersonal-web-view.user.js
-// @downloadURL https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/cursor/modern-impersonal-web-view/clean-impersonal-web-view.user.js
-// @homepageURL https://github.com/CMRNCHN/x-desktop-video-auto-next/tree/cursor/modern-impersonal-web-view
+// @updateURL   https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/main/clean-impersonal-web-view.user.js
+// @downloadURL https://raw.githubusercontent.com/CMRNCHN/x-desktop-video-auto-next/main/clean-impersonal-web-view.user.js
+// @homepageURL https://github.com/CMRNCHN/x-desktop-video-auto-next
 // @run-at      document-start
 // @grant       none
 // ==/UserScript==
