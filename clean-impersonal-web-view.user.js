@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View
-// @version     3.0.1
-// @description Strips branding and restyles pages to a modern generic look; swaps media for a curated stock set so sites still read like ordinary websites.
+// @version     3.1.0
+// @description Strips branding and restyles pages to a muted generic look; swaps media for a curated stock set so sites still read like ordinary websites.
 // @author      Senior Engineer
 // @match       http://*/*
 // @match       https://*/*
@@ -15,6 +15,9 @@
     const STYLE_ID = 'impersonal-theme-styles';
     const FONT_ID = 'impersonal-theme-font';
     const MARK = 'data-impersonal-media';
+    const NUM_CLASS = 'impersonal-num';
+    const TEXT = '#5c5954';
+    const NUM = '#7d8b86';
 
     // Curated stock photos: office, city, nature, product, lifestyle
     const STOCK_PHOTOS = [
@@ -53,9 +56,9 @@
         'data:image/svg+xml,' +
         encodeURIComponent(
             '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="40" viewBox="0 0 160 40" fill="none">' +
-                '<rect width="160" height="40" rx="8" fill="#EEF2F7"/>' +
-                '<rect x="10" y="10" width="20" height="20" rx="6" fill="#3B82F6"/>' +
-                '<rect x="40" y="14" width="72" height="12" rx="4" fill="#94A3B8"/>' +
+                '<rect width="160" height="40" rx="8" fill="#E4E1DC"/>' +
+                '<rect x="10" y="10" width="20" height="20" rx="6" fill="#9AA3A0"/>' +
+                '<rect x="40" y="14" width="72" height="12" rx="4" fill="#B0AAA3"/>' +
                 '</svg>'
         );
 
@@ -122,18 +125,19 @@
 
         style.textContent = [
             ':root {',
-            '  --bg: #f4f6f9 !important;',
-            '  --surface: #ffffff !important;',
-            '  --surface-muted: #eef2f7 !important;',
-            '  --text: #0f172a !important;',
-            '  --text-muted: #64748b !important;',
-            '  --border: #e2e8f0 !important;',
-            '  --accent: #3b82f6 !important;',
-            '  --accent-hover: #2563eb !important;',
-            '  --accent-soft: #dbeafe !important;',
-            '  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06) !important;',
-            '  --radius: 12px !important;',
-            '  --radius-sm: 8px !important;',
+            '  --bg: #e8e5e0 !important;',
+            '  --surface: #f0eeea !important;',
+            '  --surface-muted: #e2dfd9 !important;',
+            '  --text: ' + TEXT + ' !important;',
+            '  --text-muted: #8a8580 !important;',
+            '  --num: ' + NUM + ' !important;',
+            '  --border: #d2cec7 !important;',
+            '  --accent: #7a8580 !important;',
+            '  --accent-hover: #636c68 !important;',
+            '  --accent-soft: #d8ddd9 !important;',
+            '  --shadow: none !important;',
+            '  --radius: 10px !important;',
+            '  --radius-sm: 6px !important;',
             '  --font: "Plus Jakarta Sans", "Segoe UI", sans-serif !important;',
             '  --font-mono: "IBM Plex Mono", ui-monospace, monospace !important;',
             '}',
@@ -146,18 +150,29 @@
             '  -webkit-font-smoothing: antialiased !important;',
             '}',
             '*, *::before, *::after {',
-            '  font-family: inherit;',
-            '  text-shadow: none !important;',
-            '  scrollbar-color: #94a3b8 var(--surface-muted) !important;',
-            '}',
-            'body, p, li, span, label, td, th, small, strong, em, h1, h2, h3, h4, h5, h6 {',
+            '  font-family: inherit !important;',
             '  color: var(--text) !important;',
+            '  text-shadow: none !important;',
+            '  caret-color: var(--text) !important;',
+            '  scrollbar-color: #b0aaa3 var(--surface-muted) !important;',
+            '}',
+            'div, section, article, main, header, footer, aside, nav,',
+            'ul, ol, li, p, span, label, td, th, small, strong, em, b, i,',
+            'h1, h2, h3, h4, h5, h6, figcaption, blockquote, time, cite {',
+            '  color: var(--text) !important;',
+            '  background-image: none !important;',
             '}',
             'h1, h2, h3, h4, h5, h6 {',
             '  font-family: var(--font) !important;',
-            '  font-weight: 650 !important;',
-            '  letter-spacing: -0.02em !important;',
-            '  line-height: 1.25 !important;',
+            '  font-weight: 600 !important;',
+            '  letter-spacing: -0.01em !important;',
+            '  line-height: 1.3 !important;',
+            '  color: var(--text) !important;',
+            '}',
+            '.' + NUM_CLASS + ',',
+            '.' + NUM_CLASS + ' * {',
+            '  color: var(--num) !important;',
+            '  font-variant-numeric: tabular-nums !important;',
             '}',
             'header, footer, nav, [role="banner"], [role="navigation"],',
             '[class*="header" i], [id*="header" i],',
@@ -167,6 +182,7 @@
             '  background-image: none !important;',
             '  border-color: var(--border) !important;',
             '  box-shadow: none !important;',
+            '  color: var(--text) !important;',
             '}',
             'main, article, [role="main"],',
             '[class*="card" i], [class*="panel" i], [class*="modal" i],',
@@ -174,20 +190,21 @@
             '  background-color: var(--surface) !important;',
             '  border-color: var(--border) !important;',
             '  border-radius: var(--radius) !important;',
-            '  box-shadow: var(--shadow) !important;',
+            '  box-shadow: none !important;',
+            '  color: var(--text) !important;',
             '}',
             '[style*="gradient"],',
             '[class*="gradient" i],',
             '[class*="glow" i],',
             '[class*="neon" i] {',
             '  background-image: none !important;',
-            '  box-shadow: var(--shadow) !important;',
+            '  box-shadow: none !important;',
             '  filter: none !important;',
             '}',
             'img, picture, video, canvas, embed, object, iframe {',
-            '  opacity: 1 !important;',
+            '  opacity: 0.78 !important;',
             '  visibility: visible !important;',
-            '  filter: none !important;',
+            '  filter: saturate(0.4) brightness(0.94) contrast(0.92) !important;',
             '  border-radius: var(--radius-sm) !important;',
             '  object-fit: cover !important;',
             '}',
@@ -195,11 +212,11 @@
             '  background: var(--surface-muted) !important;',
             '}',
             LOGO_SELECTORS + ' {',
-            '  opacity: 1 !important;',
+            '  opacity: 0.7 !important;',
             '  visibility: visible !important;',
-            '  filter: none !important;',
+            '  filter: saturate(0.2) brightness(0.95) !important;',
             '}',
-            'svg { color: var(--text-muted) !important; }',
+            'svg { color: var(--text-muted) !important; fill: currentColor; }',
             '[class*="promo" i],',
             '[class*="advert" i],',
             '[class*="sponsor" i],',
@@ -217,9 +234,8 @@
             'a {',
             '  color: var(--accent) !important;',
             '  text-decoration: none !important;',
-            '  font-weight: 550 !important;',
+            '  font-weight: 500 !important;',
             '  background-image: none !important;',
-            '  transition: color 0.15s ease, background-color 0.15s ease !important;',
             '}',
             'a:hover {',
             '  color: var(--accent-hover) !important;',
@@ -227,10 +243,10 @@
             '}',
             'nav a, header a, [role="navigation"] a {',
             '  color: var(--text) !important;',
-            '  font-weight: 600 !important;',
+            '  font-weight: 500 !important;',
             '  text-decoration: none !important;',
-            '  padding: 8px 12px !important;',
-            '  border-radius: 999px !important;',
+            '  padding: 6px 10px !important;',
+            '  border-radius: 6px !important;',
             '}',
             'nav a:hover, header a:hover, [role="navigation"] a:hover {',
             '  background-color: var(--surface-muted) !important;',
@@ -244,23 +260,25 @@
             '[role="button"],',
             '[class*="btn" i],',
             '[class*="button" i] {',
-            '  background: var(--accent) !important;',
-            '  color: #ffffff !important;',
-            '  border: 1px solid var(--accent) !important;',
-            '  border-radius: 999px !important;',
-            '  font-weight: 600 !important;',
+            '  background: var(--surface-muted) !important;',
+            '  color: var(--text) !important;',
+            '  border: 1px solid var(--border) !important;',
+            '  border-radius: 6px !important;',
+            '  font-weight: 500 !important;',
             '  font-family: var(--font) !important;',
-            '  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.25) !important;',
-            '  transition: background 0.15s ease, transform 0.15s ease !important;',
+            '  box-shadow: none !important;',
             '}',
             'button:hover,',
             'input[type="button"]:hover,',
             'input[type="submit"]:hover,',
             '[role="button"]:hover,',
             '[class*="btn" i]:hover {',
-            '  background: var(--accent-hover) !important;',
-            '  border-color: var(--accent-hover) !important;',
-            '  color: #ffffff !important;',
+            '  background: var(--border) !important;',
+            '  border-color: var(--text-muted) !important;',
+            '  color: var(--text) !important;',
+            '}',
+            'button *, [role="button"] *, [class*="btn" i] *, [class*="button" i] * {',
+            '  color: var(--text) !important;',
             '}',
             'input, textarea, select {',
             '  background: var(--surface) !important;',
@@ -273,12 +291,13 @@
             '}',
             'input:focus, textarea:focus, select:focus {',
             '  border-color: var(--accent) !important;',
-            '  outline: 3px solid var(--accent-soft) !important;',
+            '  outline: 2px solid var(--accent-soft) !important;',
             '  box-shadow: none !important;',
             '}',
+            '::placeholder { color: var(--text-muted) !important; opacity: 1 !important; }',
             'table { border-collapse: separate !important; border-spacing: 0 !important; width: 100% !important; }',
-            'th, td { border: 1px solid var(--border) !important; padding: 10px 14px !important; }',
-            'th { background: var(--surface-muted) !important; font-weight: 650 !important; color: var(--text) !important; }',
+            'th, td { border: 1px solid var(--border) !important; padding: 10px 14px !important; color: var(--text) !important; }',
+            'th { background: var(--surface-muted) !important; font-weight: 600 !important; }',
             'code, pre, kbd, samp {',
             '  font-family: var(--font-mono) !important;',
             '  background: var(--surface-muted) !important;',
@@ -287,7 +306,7 @@
             '  border-radius: 6px !important;',
             '}',
             'blockquote {',
-            '  border-left: 3px solid var(--accent) !important;',
+            '  border-left: 3px solid var(--border) !important;',
             '  background: var(--surface-muted) !important;',
             '  color: var(--text-muted) !important;',
             '  padding: 12px 16px !important;',
@@ -481,7 +500,7 @@
 
         nodes.forEach((el) => {
             if (el.style.boxShadow && /rgb|#|hsl/i.test(el.style.boxShadow)) {
-                // Keep light elevation via CSS theme; drop neon brand shadows
+                // Keep layout quiet; drop neon brand shadows
                 if (/0px|rgba\(0,\s*0,\s*0/i.test(el.style.boxShadow) === false) {
                     el.style.boxShadow = '';
                 }
@@ -489,10 +508,62 @@
             if (el.style.filter && /hue|saturate|drop-shadow/i.test(el.style.filter)) {
                 el.style.filter = 'none';
             }
-            if (el.style.color && /rgb|#|hsl/i.test(el.style.color)) {
-                // Let stylesheet color tokens win
-                el.style.color = '';
+            if (el.style.color && /rgb|#|hsl|var\(/i.test(el.style.color)) {
+                // Force readable muted text (sites often leave white text after we lighten backgrounds)
+                el.style.setProperty('color', TEXT, 'important');
             }
+            if (el.style.webkitTextFillColor) {
+                el.style.setProperty('-webkit-text-fill-color', TEXT, 'important');
+            }
+        });
+    }
+
+    function tintNumbers(root) {
+        const scope = root && root.nodeType ? root : document.body;
+        if (!scope || !document.createTreeWalker) return;
+
+        const skip = 'script, style, noscript, textarea, input, select, option, code, pre, kbd, samp, .' + NUM_CLASS;
+        const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+            acceptNode: function (node) {
+                if (!node.nodeValue || !/\d/.test(node.nodeValue)) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                const parent = node.parentElement;
+                if (!parent) return NodeFilter.FILTER_REJECT;
+                if (parent.closest && parent.closest(skip)) return NodeFilter.FILTER_REJECT;
+                if (parent.isContentEditable) return NodeFilter.FILTER_REJECT;
+                return NodeFilter.FILTER_ACCEPT;
+            },
+        });
+
+        const nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+
+        nodes.forEach(function (textNode) {
+            const text = textNode.nodeValue;
+            const re = /\d[\d,]*(?:\.\d+)?/g;
+            let match;
+            let last = 0;
+            const frag = document.createDocumentFragment();
+            let touched = false;
+
+            while ((match = re.exec(text))) {
+                touched = true;
+                if (match.index > last) {
+                    frag.appendChild(document.createTextNode(text.slice(last, match.index)));
+                }
+                const span = document.createElement('span');
+                span.className = NUM_CLASS;
+                span.textContent = match[0];
+                frag.appendChild(span);
+                last = match.index + match[0].length;
+            }
+
+            if (!touched || !textNode.parentNode) return;
+            if (last < text.length) {
+                frag.appendChild(document.createTextNode(text.slice(last)));
+            }
+            textNode.parentNode.replaceChild(frag, textNode);
         });
     }
 
@@ -517,6 +588,7 @@
         injectStyles();
         blankInlineBrandStyles(root || document);
         replaceMedia(root || document);
+        tintNumbers((root && root.body) || root || document.body || document.documentElement);
         neutralizeDocumentTitle();
     }
 
