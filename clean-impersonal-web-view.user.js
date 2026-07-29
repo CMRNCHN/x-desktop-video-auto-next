@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     3.9.0
+// @version     3.10.0
 // @description Strips branding and restyles pages to a muted generic look; swaps media for a curated stock set so sites still read like ordinary websites.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -644,6 +644,107 @@
             '  font-size: 1.06em !important;',
             '  font-weight: 800 !important;',
             '  white-space: nowrap !important;',
+            '}',
+            'body .dataTables_paginate,',
+            'body .dataTables_info,',
+            'body ul.pagination,',
+            'body nav.pagination,',
+            'body .pagination,',
+            'body [class*="dataTables_paginate" i],',
+            'body [class*="paginate_button" i],',
+            'body [data-impersonal-native-pager-hidden="1"] {',
+            '  display: none !important;',
+            '  visibility: hidden !important;',
+            '  height: 0 !important;',
+            '  max-height: 0 !important;',
+            '  overflow: hidden !important;',
+            '  margin: 0 !important;',
+            '  padding: 0 !important;',
+            '}',
+            'body .impersonal-table-pager {',
+            '  display: flex !important;',
+            '  flex-wrap: wrap !important;',
+            '  align-items: center !important;',
+            '  gap: 8px !important;',
+            '  width: 100% !important;',
+            '  margin: 8px 0 0 !important;',
+            '  padding: 8px 10px !important;',
+            '  border: 1px solid #bdb7ae !important;',
+            '  border-radius: 8px !important;',
+            '  background: #ebe7e1 !important;',
+            '  box-sizing: border-box !important;',
+            '  font-size: 13px !important;',
+            '  font-weight: 700 !important;',
+            '  color: var(--text) !important;',
+            '}',
+            'body .impersonal-table-pager .imp-pager-status {',
+            '  font-weight: 800 !important;',
+            '  margin-right: 4px !important;',
+            '}',
+            'body .impersonal-table-pager .imp-pager-preview {',
+            '  display: flex !important;',
+            '  flex-wrap: wrap !important;',
+            '  gap: 4px !important;',
+            '  align-items: center !important;',
+            '}',
+            'body .impersonal-table-pager .imp-pager-preview-label {',
+            '  color: var(--text-muted) !important;',
+            '  font-size: 11px !important;',
+            '  text-transform: uppercase !important;',
+            '  letter-spacing: 0.03em !important;',
+            '  margin-right: 2px !important;',
+            '}',
+            'body .impersonal-table-pager button,',
+            'body .impersonal-table-pager .imp-pager-jump-go {',
+            '  padding: 6px 10px !important;',
+            '  border: 1px solid #a8a297 !important;',
+            '  border-radius: 5px !important;',
+            '  background: #d8d3cb !important;',
+            '  color: var(--text) !important;',
+            '  font-size: 13px !important;',
+            '  font-weight: 800 !important;',
+            '  cursor: pointer !important;',
+            '  line-height: 1.2 !important;',
+            '}',
+            'body .impersonal-table-pager button:disabled {',
+            '  opacity: 0.45 !important;',
+            '  cursor: not-allowed !important;',
+            '}',
+            'body .impersonal-table-pager button.imp-pager-preview-btn {',
+            '  min-width: 2.4em !important;',
+            '  background: #f7f5f1 !important;',
+            '}',
+            'body .impersonal-table-pager button.imp-pager-preview-btn.has-matches {',
+            '  background: #c8ecd0 !important;',
+            '  border-color: #7fb88a !important;',
+            '}',
+            'body .impersonal-table-pager button.imp-pager-preview-btn.no-matches {',
+            '  background: #e8d5d0 !important;',
+            '  border-color: #c4a39a !important;',
+            '  opacity: 0.75 !important;',
+            '}',
+            'body .impersonal-table-pager .imp-pager-jump {',
+            '  display: inline-flex !important;',
+            '  align-items: center !important;',
+            '  gap: 4px !important;',
+            '  margin-left: auto !important;',
+            '}',
+            'body .impersonal-table-pager .imp-pager-jump input {',
+            '  width: 64px !important;',
+            '  min-width: 64px !important;',
+            '  padding: 5px 8px !important;',
+            '  border: 1px solid #a8a297 !important;',
+            '  border-radius: 5px !important;',
+            '  background: #f7f5f1 !important;',
+            '  color: var(--text) !important;',
+            '  font-size: 13px !important;',
+            '  font-weight: 800 !important;',
+            '}',
+            'body .impersonal-table-pager .imp-pager-note {',
+            '  width: 100% !important;',
+            '  color: var(--text-muted) !important;',
+            '  font-size: 12px !important;',
+            '  font-weight: 650 !important;',
             '}',
             'body code, body pre, body kbd, body samp {',
             '  font-family: var(--font-mono) !important;',
@@ -1620,7 +1721,7 @@
             }
             Array.prototype.forEach.call(nodes, function (el) {
                 if (!el || !el.style) return;
-                if (el.closest && el.closest('.impersonal-table-shell, .impersonal-table-filters, .impersonal-bin-filter, #' + PANEL_ID)) {
+                if (el.closest && el.closest('.impersonal-table-shell, .impersonal-table-filters, .impersonal-table-pager, .impersonal-bin-filter, #' + PANEL_ID)) {
                     return;
                 }
                 el.style.setProperty('display', 'none', 'important');
@@ -1696,6 +1797,10 @@
                 const stats = applyColumnFilters(table, filter);
                 const countEl = filter.querySelector('.imp-filter-count');
                 if (countEl) countEl.textContent = stats.visible + ' / ' + stats.total + ' rows';
+                if (shell._impRefreshPager) shell._impRefreshPager();
+                if (stats.visible === 0) {
+                    skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'filter');
+                }
             }
 
             filter.addEventListener('change', runFilter);
@@ -1776,6 +1881,600 @@
         if (filter._impRunFilter) filter._impRunFilter();
     }
 
+
+    const PAGER_SKIP_KEY = 'impersonal-pager-skip-v1';
+    const PAGER_PREVIEW_COUNT = 5;
+    const PAGER_MAX_SKIPS = 40;
+
+    function countVisibleTableRows(table) {
+        let visible = 0;
+        let total = 0;
+        Array.prototype.forEach.call(table.rows, function (row) {
+            if (isHeaderRow(row, table)) return;
+            total += 1;
+            if (row.getAttribute('data-impersonal-complete-hidden') === '1') return;
+            if (row.getAttribute('data-impersonal-colfilter-hidden') === '1') return;
+            if (row.getAttribute('data-impersonal-bin-hidden') === '1') return;
+            if (row.style && row.style.display === 'none') return;
+            visible += 1;
+        });
+        return { visible: visible, total: total };
+    }
+
+    function getJQuery() {
+        return window.jQuery || window.$ || null;
+    }
+
+    function getDataTableApi(table) {
+        const $ = getJQuery();
+        if (!$ || !$.fn || !$.fn.dataTable) return null;
+        try {
+            if ($.fn.dataTable.isDataTable && $.fn.dataTable.isDataTable(table)) {
+                return $(table).DataTable();
+            }
+        } catch (err) {
+            return null;
+        }
+        return null;
+    }
+
+    function parsePageNumber(text, href) {
+        const t = String(text || '').replace(/,/g, '').trim();
+        if (/^\d+$/.test(t)) return parseInt(t, 10);
+        const h = String(href || '');
+        let m = h.match(/[?&](?:page|p|pg|pagenumber|page_number)=(\d+)/i);
+        if (m) return parseInt(m[1], 10);
+        m = h.match(/\/page\/(\d+)\b/i);
+        if (m) return parseInt(m[1], 10);
+        m = h.match(/[?&]start=(\d+)/i);
+        if (m) return parseInt(m[1], 10);
+        return null;
+    }
+
+    function findNativePagerRoot(table) {
+        const shell = table.closest && table.closest('.impersonal-table-shell');
+        const scopes = [];
+        if (shell && shell.parentElement) scopes.push(shell.parentElement);
+        if (table.closest) {
+            const wrap = table.closest('.dataTables_wrapper, .card, .card-body, .table-responsive, main, .content, form');
+            if (wrap) scopes.push(wrap);
+        }
+        scopes.push(document.body);
+
+        const selector = [
+            '.dataTables_paginate',
+            'ul.pagination',
+            'nav.pagination',
+            '.pagination',
+            '[class*="dataTables_paginate" i]',
+            '[aria-label*="pagination" i]',
+            '[class*="pager" i]',
+        ].join(',');
+
+        let best = null;
+        let bestDist = Infinity;
+        scopes.forEach(function (scope) {
+            if (!scope || !scope.querySelectorAll) return;
+            let nodes;
+            try {
+                nodes = scope.querySelectorAll(selector);
+            } catch (err) {
+                return;
+            }
+            Array.prototype.forEach.call(nodes, function (el) {
+                if (!el || (el.closest && el.closest('.impersonal-table-pager, #' + PANEL_ID))) return;
+                if (el.classList && el.classList.contains('impersonal-table-pager')) return;
+                const rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+                const tRect = table.getBoundingClientRect ? table.getBoundingClientRect() : null;
+                let dist = 9999;
+                if (rect && tRect) dist = Math.abs(rect.top - tRect.bottom);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = el;
+                }
+            });
+        });
+        return best;
+    }
+
+    function collectPagerLinks(root) {
+        if (!root) return [];
+        const links = [];
+        const nodes = root.querySelectorAll('a, button, span[data-dt-idx], li a, .paginate_button');
+        Array.prototype.forEach.call(nodes, function (el) {
+            const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+            const href = el.getAttribute && (el.getAttribute('href') || el.getAttribute('data-href')) || '';
+            const page = parsePageNumber(text, href);
+            const low = text.toLowerCase();
+            const rel = ((el.getAttribute && el.getAttribute('rel')) || '').toLowerCase();
+            const isNext = rel === 'next' || /^(next|›|»|>|→)$/i.test(text) || /next/i.test(el.className || '');
+            const isPrev = rel === 'prev' || /^(prev|previous|‹|«|<|←)$/i.test(text) || /prev/i.test(el.className || '');
+            const isLast = /^(last|»»|≫)$/i.test(text) || /last/i.test(el.className || '');
+            const isFirst = /^(first|««|≪)$/i.test(text) || /first/i.test(el.className || '');
+            const disabled = el.classList && (el.classList.contains('disabled') || el.classList.contains('current') || el.classList.contains('active'));
+            links.push({
+                el: el,
+                text: text,
+                href: href,
+                page: page,
+                isNext: isNext,
+                isPrev: isPrev,
+                isLast: isLast,
+                isFirst: isFirst,
+                disabled: !!disabled || el.hasAttribute('disabled'),
+            });
+        });
+        return links;
+    }
+
+    function buildUrlPageHref(page) {
+        try {
+            const url = new URL(window.location.href);
+            if (url.searchParams.has('page')) {
+                url.searchParams.set('page', String(page));
+                return url.toString();
+            }
+            if (url.searchParams.has('p')) {
+                url.searchParams.set('p', String(page));
+                return url.toString();
+            }
+            if (url.searchParams.has('pg')) {
+                url.searchParams.set('pg', String(page));
+                return url.toString();
+            }
+            url.searchParams.set('page', String(page));
+            return url.toString();
+        } catch (err) {
+            return null;
+        }
+    }
+
+    function readSkipState() {
+        try {
+            const raw = sessionStorage.getItem(PAGER_SKIP_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (err) {
+            return null;
+        }
+    }
+
+    function writeSkipState(state) {
+        try {
+            if (!state) sessionStorage.removeItem(PAGER_SKIP_KEY);
+            else sessionStorage.setItem(PAGER_SKIP_KEY, JSON.stringify(state));
+        } catch (err) {
+            // ignore
+        }
+    }
+
+    function createPagerDriver(table) {
+        const api = getDataTableApi(table);
+        if (api) {
+            return {
+                kind: 'datatable',
+                getInfo: function () {
+                    try {
+                        const info = api.page.info();
+                        return {
+                            page: (info.page || 0) + 1,
+                            pages: info.pages || 1,
+                            length: info.length || 0,
+                        };
+                    } catch (err) {
+                        return { page: 1, pages: 1, length: 0 };
+                    }
+                },
+                goPage: function (page1) {
+                    const info = this.getInfo();
+                    const target = Math.max(1, Math.min(info.pages, page1 | 0)) - 1;
+                    if (target === info.page - 1) return false;
+                    api.page(target).draw(false);
+                    return true;
+                },
+                goNext: function () {
+                    const info = this.getInfo();
+                    if (info.page >= info.pages) return false;
+                    return this.goPage(info.page + 1);
+                },
+                goLast: function () {
+                    const info = this.getInfo();
+                    return this.goPage(info.pages);
+                },
+                previewPages: function () {
+                    const info = this.getInfo();
+                    const out = [];
+                    for (let i = 1; i <= PAGER_PREVIEW_COUNT; i++) {
+                        const p = info.page + i;
+                        if (p > info.pages) break;
+                        out.push({ page: p, matches: null });
+                    }
+                    return out;
+                },
+                estimateMatches: function (page1) {
+                    try {
+                        const info = api.page.info();
+                        const page0 = page1 - 1;
+                        if (page0 < 0 || page0 >= info.pages) return null;
+                        const indexes = api.rows({ search: 'applied', order: 'applied' }).indexes().toArray();
+                        const start = page0 * info.length;
+                        const slice = indexes.slice(start, start + info.length);
+                        if (!slice.length) return 0;
+                        // Only exact for current page DOM; for others approximate by assuming all pass unless we can read nodes
+                        let matches = 0;
+                        let known = 0;
+                        slice.forEach(function (idx) {
+                            const node = api.row(idx).node();
+                            if (!node) return;
+                            known += 1;
+                            if (node.getAttribute('data-impersonal-complete-hidden') === '1') return;
+                            if (node.getAttribute('data-impersonal-colfilter-hidden') === '1') return;
+                            if (node.getAttribute('data-impersonal-bin-hidden') === '1') return;
+                            matches += 1;
+                        });
+                        if (!known) return null;
+                        return matches;
+                    } catch (err) {
+                        return null;
+                    }
+                },
+            };
+        }
+
+        const root = findNativePagerRoot(table);
+        const links = collectPagerLinks(root);
+        let pages = [];
+        let current = null;
+        links.forEach(function (L) {
+            if (L.page != null) {
+                pages.push(L.page);
+                if (L.el.classList && (L.el.classList.contains('active') || L.el.classList.contains('current') || (L.el.parentElement && L.el.parentElement.classList && L.el.parentElement.classList.contains('active')))) {
+                    current = L.page;
+                }
+            }
+        });
+        pages = pages.filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(function (a, b) { return a - b; });
+        if (current == null) {
+            try {
+                const url = new URL(window.location.href);
+                current = parseInt(url.searchParams.get('page') || url.searchParams.get('p') || url.searchParams.get('pg') || '1', 10) || 1;
+            } catch (err) {
+                current = pages[0] || 1;
+            }
+        }
+        const maxPage = pages.length ? pages[pages.length - 1] : current;
+
+        function clickLink(pred) {
+            for (let i = 0; i < links.length; i++) {
+                if (pred(links[i])) {
+                    const el = links[i].el;
+                    if (el.disabled || links[i].disabled) return false;
+                    el.click();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        return {
+            kind: root ? 'links' : 'url',
+            getInfo: function () {
+                return { page: current, pages: maxPage, length: 0 };
+            },
+            goPage: function (page1) {
+                const target = Math.max(1, page1 | 0);
+                if (target === current) return false;
+                if (clickLink(function (L) { return L.page === target; })) return true;
+                const href = buildUrlPageHref(target);
+                if (href && href !== window.location.href) {
+                    window.location.assign(href);
+                    return true;
+                }
+                return false;
+            },
+            goNext: function () {
+                if (clickLink(function (L) { return L.isNext && !L.disabled; })) return true;
+                return this.goPage(current + 1);
+            },
+            goLast: function () {
+                if (clickLink(function (L) { return L.isLast && !L.disabled; })) return true;
+                return this.goPage(maxPage);
+            },
+            previewPages: function () {
+                const out = [];
+                for (let i = 1; i <= PAGER_PREVIEW_COUNT; i++) {
+                    const p = current + i;
+                    if (p > maxPage) break;
+                    out.push({ page: p, matches: null });
+                }
+                // Prefer explicit numbered links when available
+                if (pages.length) {
+                    const fromLinks = [];
+                    for (let i = 0; i < pages.length; i++) {
+                        if (pages[i] > current && fromLinks.length < PAGER_PREVIEW_COUNT) {
+                            fromLinks.push({ page: pages[i], matches: null });
+                        }
+                    }
+                    if (fromLinks.length) return fromLinks;
+                }
+                return out;
+            },
+            estimateMatches: function () {
+                return null;
+            },
+        };
+    }
+
+    function stripNativePagination(root) {
+        const scope = (root && root.querySelectorAll ? root : document).body || document;
+        if (!scope || !scope.querySelectorAll) return;
+        const selectors = [
+            '.dataTables_paginate',
+            '.dataTables_info',
+            'ul.pagination',
+            'nav.pagination',
+            '.pagination',
+            '[class*="dataTables_paginate" i]',
+            '[aria-label*="pagination" i]',
+        ];
+        selectors.forEach(function (sel) {
+            let nodes;
+            try {
+                nodes = scope.querySelectorAll(sel);
+            } catch (err) {
+                return;
+            }
+            Array.prototype.forEach.call(nodes, function (el) {
+                if (!el || !el.style) return;
+                if (el.closest && el.closest('.impersonal-table-pager, .impersonal-table-filters, #' + PANEL_ID)) return;
+                if (el.classList && el.classList.contains('impersonal-table-pager')) return;
+                el.style.setProperty('display', 'none', 'important');
+                el.setAttribute('data-impersonal-native-pager-hidden', '1');
+                el.setAttribute('aria-hidden', 'true');
+            });
+        });
+    }
+
+    function waitForPageSettle(table, timeoutMs) {
+        return new Promise(function (resolve) {
+            const start = Date.now();
+            const obs = new MutationObserver(function () {
+                if (Date.now() - start > 120) {
+                    obs.disconnect();
+                    resolve();
+                }
+            });
+            obs.observe(table.tBodies && table.tBodies[0] ? table.tBodies[0] : table, { childList: true, subtree: true, characterData: true });
+            setTimeout(function () {
+                obs.disconnect();
+                resolve();
+            }, timeoutMs || 900);
+        });
+    }
+
+    function refreshTableAfterPageChange(table) {
+        hideUnwantedTableColumns(table);
+        applyCompleteProfileFilter(table);
+        markTypeColumns(table);
+        const shell = table.closest && table.closest('.impersonal-table-shell');
+        if (shell) {
+            const filter = shell.querySelector('.impersonal-table-filters');
+            if (filter && filter._impRunFilter) filter._impRunFilter();
+            else applyColumnFilters(table, filter || document.createElement('div'));
+        }
+        tintNumbers(table);
+    }
+
+    async function skipEmptyFilteredPages(shell, table, driver, reason) {
+        if (!shell || !driver || shell._impPagerSkipping) return;
+        const stats = countVisibleTableRows(table);
+        if (stats.visible > 0) {
+            writeSkipState(null);
+            return;
+        }
+        if (stats.total === 0 && driver.kind === 'url') {
+            // still loading?
+            return;
+        }
+
+        shell._impPagerSkipping = true;
+        const note = shell.querySelector('.imp-pager-note');
+        let hops = 0;
+        const skipState = readSkipState() || { hops: 0, reason: reason || 'empty' };
+        try {
+            while (hops < PAGER_MAX_SKIPS) {
+                const info = driver.getInfo();
+                if (info.page >= info.pages) break;
+                hops += 1;
+                skipState.hops = (skipState.hops || 0) + 1;
+                writeSkipState(skipState);
+                if (note) note.textContent = 'No matches on this page — skipping to page ' + (info.page + 1) + '…';
+                const moved = driver.goNext();
+                if (!moved) break;
+                if (driver.kind === 'url' || driver.kind === 'links') {
+                    // full navigation or click may reload — stop here; next load continues
+                    if (driver.kind === 'url') break;
+                    await waitForPageSettle(table, 1000);
+                    refreshTableAfterPageChange(table);
+                } else {
+                    await waitForPageSettle(table, 700);
+                    refreshTableAfterPageChange(table);
+                }
+                const nextStats = countVisibleTableRows(table);
+                if (nextStats.visible > 0) {
+                    writeSkipState(null);
+                    if (note) note.textContent = 'Skipped ' + hops + ' empty page' + (hops === 1 ? '' : 's') + ' to find matches.';
+                    break;
+                }
+                if (driver.getInfo().page >= driver.getInfo().pages) {
+                    if (note) note.textContent = 'No matching rows on remaining pages.';
+                    writeSkipState(null);
+                    break;
+                }
+            }
+        } finally {
+            shell._impPagerSkipping = false;
+            if (shell._impRefreshPager) shell._impRefreshPager();
+        }
+    }
+
+    function ensureTablePager(shell, table) {
+        if (!shell || !table) return;
+
+        stripNativePagination(document);
+
+        let pager = null;
+        const existing = shell.querySelectorAll('.impersonal-table-pager');
+        Array.prototype.forEach.call(existing, function (el) {
+            if (!pager && el.getAttribute(MARK) === 'table-pager') pager = el;
+            else el.parentNode && el.parentNode.removeChild(el);
+        });
+
+        const driver = createPagerDriver(table);
+        const info = driver.getInfo();
+        // Always show pager when any native pager existed or pages > 1 or URL has page param
+        const urlHasPage = (function () {
+            try {
+                const u = new URL(window.location.href);
+                return u.searchParams.has('page') || u.searchParams.has('p') || u.searchParams.has('pg');
+            } catch (err) {
+                return false;
+            }
+        })();
+        const native = findNativePagerRoot(table);
+        if (!native && info.pages <= 1 && !urlHasPage && driver.kind !== 'datatable') {
+            if (pager) pager.style.display = 'none';
+            return;
+        }
+
+        if (!pager) {
+            pager = document.createElement('div');
+            pager.className = 'impersonal-table-pager';
+            pager.setAttribute(MARK, 'table-pager');
+            pager.innerHTML = [
+                '<span class="imp-pager-status"></span>',
+                '<button type="button" class="imp-pager-next">Next page</button>',
+                '<button type="button" class="imp-pager-last">Last page</button>',
+                '<div class="imp-pager-preview"><span class="imp-pager-preview-label">Next 5</span></div>',
+                '<div class="imp-pager-jump">',
+                '<label>Jump</label>',
+                '<input class="imp-pager-jump-input" type="number" min="1" step="1" inputmode="numeric" aria-label="Jump to page">',
+                '<button type="button" class="imp-pager-jump-go">Go</button>',
+                '</div>',
+                '<div class="imp-pager-note"></div>',
+            ].join('');
+            shell.appendChild(pager);
+
+            async function goAndMaybeSkip(action) {
+                const d = createPagerDriver(table);
+                const before = d.getInfo().page;
+                const ok = action(d);
+                if (!ok) return;
+                if (d.kind === 'datatable' || d.kind === 'links') {
+                    await waitForPageSettle(table, 900);
+                    refreshTableAfterPageChange(table);
+                    await skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'nav');
+                }
+                // url navigations continue after reload
+                if (shell._impRefreshPager) shell._impRefreshPager();
+            }
+
+            pager.querySelector('.imp-pager-next').addEventListener('click', function (e) {
+                e.preventDefault();
+                goAndMaybeSkip(function (d) { return d.goNext(); });
+            });
+            pager.querySelector('.imp-pager-last').addEventListener('click', function (e) {
+                e.preventDefault();
+                goAndMaybeSkip(function (d) { return d.goLast(); });
+            });
+            pager.querySelector('.imp-pager-jump-go').addEventListener('click', function (e) {
+                e.preventDefault();
+                const input = pager.querySelector('.imp-pager-jump-input');
+                const page = parseInt(input && input.value, 10);
+                if (!page) return;
+                goAndMaybeSkip(function (d) { return d.goPage(page); });
+            });
+            pager.querySelector('.imp-pager-jump-input').addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    pager.querySelector('.imp-pager-jump-go').click();
+                }
+            });
+        }
+
+        function refreshPager() {
+            const d = createPagerDriver(table);
+            const inf = d.getInfo();
+            const status = pager.querySelector('.imp-pager-status');
+            const nextBtn = pager.querySelector('.imp-pager-next');
+            const lastBtn = pager.querySelector('.imp-pager-last');
+            const jumpInput = pager.querySelector('.imp-pager-jump-input');
+            const preview = pager.querySelector('.imp-pager-preview');
+            const stats = countVisibleTableRows(table);
+
+            if (status) {
+                status.textContent = 'Page ' + inf.page + ' / ' + inf.pages + ' · ' + stats.visible + ' match' + (stats.visible === 1 ? '' : 'es');
+            }
+            if (nextBtn) nextBtn.disabled = inf.page >= inf.pages;
+            if (lastBtn) lastBtn.disabled = inf.page >= inf.pages;
+            if (jumpInput) {
+                jumpInput.max = String(inf.pages);
+                jumpInput.placeholder = String(inf.page);
+            }
+
+            // rebuild preview buttons
+            const label = preview.querySelector('.imp-pager-preview-label');
+            preview.innerHTML = '';
+            if (label) preview.appendChild(label);
+            else {
+                const lab = document.createElement('span');
+                lab.className = 'imp-pager-preview-label';
+                lab.textContent = 'Next 5';
+                preview.appendChild(lab);
+            }
+            const pages = d.previewPages();
+            pages.forEach(function (item) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'imp-pager-preview-btn';
+                btn.textContent = String(item.page);
+                const est = d.estimateMatches ? d.estimateMatches(item.page) : null;
+                if (est == null) {
+                    btn.title = 'Page ' + item.page;
+                } else if (est > 0) {
+                    btn.classList.add('has-matches');
+                    btn.title = est + ' visible match' + (est === 1 ? '' : 'es') + ' on page ' + item.page;
+                } else {
+                    btn.classList.add('no-matches');
+                    btn.title = 'No matches on page ' + item.page + ' (will skip)';
+                }
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    (async function () {
+                        const drv = createPagerDriver(table);
+                        if (!drv.goPage(item.page)) return;
+                        if (drv.kind === 'datatable' || drv.kind === 'links') {
+                            await waitForPageSettle(table, 900);
+                            refreshTableAfterPageChange(table);
+                            await skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'preview');
+                        }
+                        refreshPager();
+                    })();
+                });
+                preview.appendChild(btn);
+            });
+            pager.style.display = 'flex';
+        }
+
+        shell._impRefreshPager = refreshPager;
+        refreshPager();
+
+        // Continue skip after navigation reload, or skip current empty page once filters applied
+        const pending = readSkipState();
+        setTimeout(function () {
+            skipEmptyFilteredPages(shell, table, createPagerDriver(table), pending ? 'continue' : 'autoload');
+        }, 250);
+    }
+
     function fixTables(root) {
         const scope = root && root.querySelectorAll ? root : document;
         if (!scope.querySelectorAll) return;
@@ -1795,7 +2494,7 @@
         scope.querySelectorAll('table').forEach(function (table) {
             if (!table || !table.parentNode) return;
             if (table.closest && table.closest('#' + PANEL_ID)) return;
-            if (table.closest && table.closest('.impersonal-table-filters, .impersonal-bin-filter')) return;
+            if (table.closest && table.closest('.impersonal-table-filters, .impersonal-table-pager, .impersonal-bin-filter')) return;
 
             hideUnwantedTableColumns(table);
             applyCompleteProfileFilter(table);
@@ -1836,9 +2535,11 @@
             }
 
             ensureTableFilters(shell, table);
+            ensureTablePager(shell, table);
         });
 
         stripNativeFilters(scope);
+        stripNativePagination(scope);
     }
 
     function neutralizeDocumentTitle() {
