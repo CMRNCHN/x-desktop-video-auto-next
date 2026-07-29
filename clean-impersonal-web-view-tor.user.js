@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View (Tor)
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     1.5.1
+// @version     1.6.1
 // @description Tor-safe impersonal restyle: no external fonts/images, offline SVG placeholders, onion-friendly. Use Violentmonkey in Tor Browser.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -508,16 +508,17 @@
             '  left: 50% !important;',
             '  transform: translateX(-50%) !important;',
             '}',
-            'body .impersonal-bin-filter {',
+            'body .impersonal-bin-filter,',
+            'body .impersonal-table-filters {',
             '  display: flex !important;',
             '  flex-wrap: wrap !important;',
-            '  align-items: center !important;',
+            '  align-items: flex-start !important;',
             '  justify-content: center !important;',
-            '  gap: 8px 10px !important;',
+            '  gap: 10px 12px !important;',
             '  width: fit-content !important;',
             '  max-width: 98vw !important;',
             '  margin: 0 auto 16px !important;',
-            '  padding: 10px 12px !important;',
+            '  padding: 12px 14px !important;',
             '  border: 1px solid #bdb7ae !important;',
             '  border-radius: 10px !important;',
             '  background: #ebe7e1 !important;',
@@ -525,37 +526,52 @@
             '  font-size: 14px !important;',
             '  font-weight: 650 !important;',
             '}',
-            'body .impersonal-bin-filter label {',
+            'body .impersonal-table-filters .imp-filter-group {',
+            '  display: flex !important;',
+            '  flex-direction: column !important;',
+            '  gap: 4px !important;',
+            '  min-width: 120px !important;',
+            '}',
+            'body .impersonal-bin-filter label,',
+            'body .impersonal-table-filters label {',
             '  font-weight: 700 !important;',
             '  color: var(--text) !important;',
             '  margin: 0 !important;',
+            '  font-size: 12px !important;',
+            '  text-transform: uppercase !important;',
+            '  letter-spacing: 0.03em !important;',
             '}',
             'body .impersonal-bin-filter input[type="search"],',
             'body .impersonal-bin-filter textarea.imp-bin-search,',
-            'body .impersonal-bin-filter select {',
-            '  min-width: 160px !important;',
-            '  max-width: 320px !important;',
+            'body .impersonal-bin-filter select,',
+            'body .impersonal-table-filters textarea,',
+            'body .impersonal-table-filters select {',
+            '  min-width: 130px !important;',
+            '  max-width: 200px !important;',
             '  padding: 7px 10px !important;',
             '  border: 1px solid #a8a297 !important;',
             '  border-radius: 6px !important;',
             '  background: #f7f5f1 !important;',
             '  color: var(--text) !important;',
-            '  font-size: 14px !important;',
+            '  font-size: 13px !important;',
             '  font-weight: 650 !important;',
             '}',
-            'body .impersonal-bin-filter select[multiple] {',
-            '  min-width: 140px !important;',
+            'body .impersonal-bin-filter select[multiple],',
+            'body .impersonal-table-filters select[multiple] {',
+            '  min-width: 130px !important;',
             '  min-height: 88px !important;',
             '}',
-            'body .impersonal-bin-filter textarea.imp-bin-search {',
-            '  min-width: 220px !important;',
-            '  width: 260px !important;',
-            '  min-height: 64px !important;',
+            'body .impersonal-bin-filter textarea.imp-bin-search,',
+            'body .impersonal-table-filters textarea {',
+            '  min-width: 160px !important;',
+            '  width: 180px !important;',
+            '  min-height: 88px !important;',
             '  resize: vertical !important;',
             '  font-family: var(--font-mono) !important;',
             '  line-height: 1.35 !important;',
             '}',
-            'body .impersonal-bin-filter button {',
+            'body .impersonal-bin-filter button,',
+            'body .impersonal-table-filters button {',
             '  padding: 7px 12px !important;',
             '  border: 1px solid #a8a297 !important;',
             '  border-radius: 6px !important;',
@@ -564,11 +580,27 @@
             '  font-size: 13px !important;',
             '  font-weight: 700 !important;',
             '  cursor: pointer !important;',
+            '  align-self: flex-end !important;',
             '}',
-            'body .impersonal-bin-filter .imp-bin-count {',
+            'body .impersonal-bin-filter .imp-bin-count,',
+            'body .impersonal-table-filters .imp-filter-count {',
             '  color: var(--text-muted) !important;',
             '  font-size: 13px !important;',
             '  font-weight: 600 !important;',
+            '  align-self: center !important;',
+            '}',
+            'body .dataTables_filter,',
+            'body .dataTables_length,',
+            'body .dt-search,',
+            'body .dt-length,',
+            'body [data-impersonal-native-filter-hidden="1"] {',
+            '  display: none !important;',
+            '  visibility: hidden !important;',
+            '  height: 0 !important;',
+            '  max-height: 0 !important;',
+            '  overflow: hidden !important;',
+            '  margin: 0 !important;',
+            '  padding: 0 !important;',
             '}',
             'body .impersonal-table-wrap {',
             '  display: block !important;',
@@ -659,12 +691,13 @@
             'body td:nth-child(even) { box-shadow: inset 1px 0 0 rgba(80,70,55,0.06) !important; }',
             'body caption { caption-side: top !important; text-align: center !important; padding: 10px 12px !important; color: var(--text-muted) !important; font-weight: 700 !important; }',
             'body tr[data-impersonal-bin-hidden="1"],',
+            'body tr[data-impersonal-colfilter-hidden="1"],',
             'body tr[data-impersonal-complete-hidden="1"] { display: none !important; }',
-            'body tr[data-impersonal-complete="1"]:not([data-impersonal-bin-hidden="1"]) td {',
+            'body tr[data-impersonal-complete="1"]:not([data-impersonal-bin-hidden="1"]):not([data-impersonal-colfilter-hidden="1"]) td {',
             '  background: #c8ecd0 !important;',
             '  border-color: #7fb88a !important;',
             '}',
-            'body tr[data-impersonal-complete="1"]:not([data-impersonal-bin-hidden="1"]):hover td {',
+            'body tr[data-impersonal-complete="1"]:not([data-impersonal-bin-hidden="1"]):not([data-impersonal-colfilter-hidden="1"]):hover td {',
             '  background: #b6e3c0 !important;',
             '}',
             'body code, body pre, body kbd, body samp {',
@@ -1123,6 +1156,8 @@
         VENDOR: true,
         MMN: true,
         ITEM: true,
+        BASE: true,
+        COUNTRY: true,
     };
 
     const BIN_HEADER_LABELS = {
@@ -1432,136 +1467,371 @@
             });
     }
 
-    function getSelectedBinValues(select) {
+    function parseTextQueries(raw) {
+        return String(raw || '')
+            .split(/[\n,;|]+/)
+            .map(function (part) {
+                return part.replace(/\s+/g, ' ').trim().toLowerCase();
+            })
+            .filter(function (part) {
+                return part.length > 0;
+            });
+    }
+
+    function getMultiSelectValues(select) {
         if (!select) return [];
         const values = [];
         Array.prototype.forEach.call(select.selectedOptions || [], function (opt) {
-            const v = String(opt.value || '').replace(/\D/g, '');
+            const v = String(opt.value || '').trim();
             if (v) values.push(v);
         });
-        if (!values.length && select.value && select.value !== 'ALL') {
-            const one = String(select.value).replace(/\D/g, '');
-            if (one) values.push(one);
-        }
         return values;
     }
 
-    function binMatchesQueries(bin, queries) {
+    function cellText(cell) {
+        return String((cell && (cell.innerText || cell.textContent)) || '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    const TABLE_FILTER_DEFS = [
+        {
+            key: 'bin',
+            label: 'BIN',
+            labels: BIN_HEADER_LABELS,
+            numeric: true,
+            fallbackCard: true,
+        },
+        {
+            key: 'city',
+            label: 'CITY',
+            labels: { CITY: true, TOWN: true },
+            numeric: false,
+        },
+        {
+            key: 'state',
+            label: 'STATE',
+            labels: { STATE: true, ST: true, PROVINCE: true, REGION: true },
+            numeric: false,
+        },
+        {
+            key: 'zip',
+            label: 'ZIP',
+            labels: { ZIP: true, ZIPCODE: true, 'ZIP CODE': true, POSTAL: true, 'POSTAL CODE': true },
+            numeric: false,
+        },
+        {
+            key: 'bank',
+            label: 'BANK',
+            labels: { BANK: true, 'BANK NAME': true, BANKNAME: true, ISSUER: true },
+            numeric: false,
+        },
+    ];
+
+    function collectColumnValues(table, colIdx, numeric) {
+        const values = {};
+        if (colIdx < 0) return [];
+        Array.prototype.forEach.call(table.rows, function (row) {
+            if (isHeaderRow(row, table) || !row.cells[colIdx]) return;
+            let raw = cellText(row.cells[colIdx]);
+            if (numeric) raw = raw.replace(/\D/g, '').slice(0, 6);
+            if (!raw) return;
+            values[raw] = true;
+        });
+        return Object.keys(values).sort(function (a, b) {
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+        });
+    }
+
+    function rowValueForFilter(row, def, colIdx, cardIdx) {
+        if (def.key === 'bin') {
+            return getRowBin(row, colIdx, cardIdx) || '';
+        }
+        if (colIdx < 0 || !row.cells[colIdx]) return '';
+        return cellText(row.cells[colIdx]);
+    }
+
+    function valueMatchesFilter(rawValue, selected, typed, numeric) {
+        const queries = selected.concat(typed);
         if (!queries.length) return true;
-        if (!bin) return false;
+        if (!rawValue) return false;
+        const value = numeric
+            ? String(rawValue).replace(/\D/g, '')
+            : String(rawValue).trim().toLowerCase();
         for (let i = 0; i < queries.length; i++) {
-            const q = queries[i];
-            if (bin === q || bin.indexOf(q) === 0) return true;
+            let q = queries[i];
+            if (numeric) {
+                q = String(q).replace(/\D/g, '');
+                if (!q) continue;
+                if (value === q || value.indexOf(q) === 0) return true;
+            } else {
+                q = String(q).trim().toLowerCase();
+                if (!q) continue;
+                if (value === q || value.indexOf(q) === 0 || value.indexOf(q) !== -1) return true;
+            }
         }
         return false;
     }
 
-    function applyBinFilterToTable(table, selectedBins, queryRaw) {
-        const selected = Array.isArray(selectedBins) ? selectedBins.slice() : [];
-        const typed = parseBinQueries(queryRaw);
-        const queries = selected.concat(typed);
+    function applyColumnFilters(table, filterRoot) {
+        const headerCells = getTableHeaderCells(table);
+        const cardIdx = findColumnIndexByLabels(headerCells, CARD_HEADER_LABELS);
+        const active = [];
+
+        TABLE_FILTER_DEFS.forEach(function (def) {
+            const group = filterRoot.querySelector('[data-filter-key="' + def.key + '"]');
+            if (!group || group.style.display === 'none') return;
+            const select = group.querySelector('select');
+            const area = group.querySelector('textarea');
+            const colIdx = findColumnIndexByLabels(headerCells, def.labels);
+            const selected = getMultiSelectValues(select).map(function (v) {
+                return def.numeric ? v.replace(/\D/g, '') : v.toLowerCase();
+            });
+            const typed = def.numeric ? parseBinQueries(area && area.value) : parseTextQueries(area && area.value);
+            active.push({
+                def: def,
+                colIdx: colIdx,
+                cardIdx: def.fallbackCard ? cardIdx : -1,
+                selected: selected,
+                typed: typed,
+            });
+        });
+
         let visible = 0;
         let total = 0;
-
         Array.prototype.forEach.call(table.rows, function (row) {
             if (isHeaderRow(row, table)) return;
             total += 1;
-            const bin = row.getAttribute('data-impersonal-bin') || '';
-            const show = binMatchesQueries(bin, queries);
-            if (show) {
-                row.removeAttribute('data-impersonal-bin-hidden');
-                if (row.getAttribute('data-impersonal-complete-hidden') !== '1') {
-                    visible += 1;
+            let show = true;
+            for (let i = 0; i < active.length; i++) {
+                const a = active[i];
+                const raw = rowValueForFilter(row, a.def, a.colIdx, a.cardIdx);
+                if (!valueMatchesFilter(raw, a.selected, a.typed, a.def.numeric)) {
+                    show = false;
+                    break;
                 }
+            }
+            if (show) {
+                row.removeAttribute('data-impersonal-colfilter-hidden');
+                row.removeAttribute('data-impersonal-bin-hidden');
+                if (row.getAttribute('data-impersonal-complete-hidden') !== '1') visible += 1;
             } else {
+                row.setAttribute('data-impersonal-colfilter-hidden', '1');
                 row.setAttribute('data-impersonal-bin-hidden', '1');
             }
         });
-
-        return { visible: visible, total: total, queryCount: queries.length };
+        return { visible: visible, total: total };
     }
 
-    function ensureBinFilter(shell, table) {
-        const headerCells = getTableHeaderCells(table);
-        const binIdx = findColumnIndexByLabels(headerCells, BIN_HEADER_LABELS);
-        const cardIdx = findColumnIndexByLabels(headerCells, CARD_HEADER_LABELS);
-        const bins = collectTableBins(table, binIdx, cardIdx);
+    function stripNativeFilters(root) {
+        const scope = (root && root.querySelectorAll ? root : document).body || document;
+        if (!scope || !scope.querySelectorAll) return;
 
-        let filter = shell.querySelector('.impersonal-bin-filter');
-        if (filter && !filter.querySelector('textarea.imp-bin-search')) {
-            filter.parentNode.removeChild(filter);
-            filter = null;
-        }
+        const selectors = [
+            '.dataTables_filter',
+            '.dataTables_length',
+            '.dt-search',
+            '.dt-length',
+            '.table-filters',
+            '.filter-toolbar',
+            '.filter-bar',
+            '.filters-bar',
+            '.search-filters',
+            '.datatable-filter',
+            '[class*="tableFilter" i]',
+            '[class*="filter-bar" i]',
+            '[class*="filterBar" i]',
+            '[class*="filters-wrap" i]',
+            '[id*="table-filter" i]',
+            '[id*="datatable-filter" i]',
+        ];
+
+        selectors.forEach(function (sel) {
+            let nodes;
+            try {
+                nodes = scope.querySelectorAll(sel);
+            } catch (err) {
+                return;
+            }
+            Array.prototype.forEach.call(nodes, function (el) {
+                if (!el || !el.style) return;
+                if (el.closest && el.closest('.impersonal-table-shell, .impersonal-table-filters, .impersonal-bin-filter, #' + PANEL_ID)) {
+                    return;
+                }
+                el.style.setProperty('display', 'none', 'important');
+                el.setAttribute('data-impersonal-native-filter-hidden', '1');
+                el.setAttribute('aria-hidden', 'true');
+            });
+        });
+
+        // Hide unlabeled filter forms sitting directly above our tables
+        Array.prototype.forEach.call(document.querySelectorAll('.impersonal-table-shell'), function (shell) {
+            let prev = shell.previousElementSibling;
+            let hops = 0;
+            while (prev && hops < 4) {
+                hops += 1;
+                if (prev.classList && (prev.classList.contains('impersonal-table-shell') || prev.classList.contains('impersonal-table-filters'))) {
+                    break;
+                }
+                const text = (prev.innerText || '').toLowerCase();
+                const looksFilter =
+                    (prev.matches && prev.matches('form, .card, .card-header, .row, .toolbar, [class*="filter" i], [class*="search" i]')) ||
+                    /filter|search|bin\b|show\s+\d+|entries/.test(text);
+                const hasControls = prev.querySelector && prev.querySelector('select, input[type="search"], input[type="text"], button');
+                if (looksFilter && hasControls && !(prev.querySelector && prev.querySelector('table'))) {
+                    prev.style.setProperty('display', 'none', 'important');
+                    prev.setAttribute('data-impersonal-native-filter-hidden', '1');
+                }
+                prev = prev.previousElementSibling;
+            }
+        });
+    }
+
+    function ensureTableFilters(shell, table) {
+        // Remove duplicates / legacy bars — only one filter UI per shell
+        const existingBars = shell.querySelectorAll('.impersonal-bin-filter, .impersonal-table-filters');
+        let filter = null;
+        Array.prototype.forEach.call(existingBars, function (el) {
+            if (!filter && el.classList.contains('impersonal-table-filters') && el.getAttribute(MARK) === 'table-filters') {
+                filter = el;
+            } else {
+                el.parentNode && el.parentNode.removeChild(el);
+            }
+        });
+
+        const headerCells = getTableHeaderCells(table);
+        const cardIdx = findColumnIndexByLabels(headerCells, CARD_HEADER_LABELS);
+
         if (!filter) {
             filter = document.createElement('div');
-            filter.className = 'impersonal-bin-filter';
-            filter.setAttribute(MARK, 'bin-filter');
-            filter.innerHTML = [
-                '<label>BIN</label>',
-                '<select class="imp-bin-select" multiple size="4" aria-label="Filter by one or more BINs"></select>',
-                '<textarea class="imp-bin-search" rows="3" spellcheck="false" placeholder="Multiple BINs OK&#10;411111, 424242&#10;400000" aria-label="BIN list filter"></textarea>',
-                '<button type="button" class="imp-bin-clear">Clear</button>',
-                '<span class="imp-bin-count"></span>',
-            ].join('');
+            filter.className = 'impersonal-table-filters';
+            filter.setAttribute(MARK, 'table-filters');
+
+            TABLE_FILTER_DEFS.forEach(function (def) {
+                const group = document.createElement('div');
+                group.className = 'imp-filter-group';
+                group.setAttribute('data-filter-key', def.key);
+                group.innerHTML = [
+                    '<label>' + def.label + '</label>',
+                    '<select class="imp-filter-select" multiple size="4" aria-label="Filter by ' + def.label + '"></select>',
+                    '<textarea class="imp-filter-text" rows="3" spellcheck="false" placeholder="' +
+                        (def.numeric ? 'Multiple OK\n411111, 424242' : 'Multiple OK\nvalue1, value2') +
+                        '" aria-label="' + def.label + ' list filter"></textarea>',
+                ].join('');
+                filter.appendChild(group);
+            });
+
+            const actions = document.createElement('div');
+            actions.className = 'imp-filter-group';
+            actions.innerHTML = '<label>&nbsp;</label><button type="button" class="imp-filter-clear">Clear filters</button><span class="imp-filter-count"></span>';
+            filter.appendChild(actions);
             shell.insertBefore(filter, shell.firstChild);
 
-            const select = filter.querySelector('.imp-bin-select');
-            const search = filter.querySelector('.imp-bin-search');
-            const clearBtn = filter.querySelector('.imp-bin-clear');
-            const countEl = filter.querySelector('.imp-bin-count');
-
             function runFilter() {
-                const stats = applyBinFilterToTable(table, getSelectedBinValues(select), search.value);
-                const extra = stats.queryCount ? ' · ' + stats.queryCount + ' BIN filter' + (stats.queryCount === 1 ? '' : 's') : '';
-                countEl.textContent = stats.visible + ' / ' + stats.total + ' rows' + extra;
+                const stats = applyColumnFilters(table, filter);
+                const countEl = filter.querySelector('.imp-filter-count');
+                if (countEl) countEl.textContent = stats.visible + ' / ' + stats.total + ' rows';
             }
 
-            select.addEventListener('change', runFilter);
-            search.addEventListener('input', runFilter);
-            clearBtn.addEventListener('click', function (e) {
+            filter.addEventListener('change', runFilter);
+            filter.addEventListener('input', runFilter);
+            filter.querySelector('.imp-filter-clear').addEventListener('click', function (e) {
                 e.preventDefault();
-                Array.prototype.forEach.call(select.options, function (opt) {
+                Array.prototype.forEach.call(filter.querySelectorAll('select option'), function (opt) {
                     opt.selected = false;
                 });
-                search.value = '';
+                Array.prototype.forEach.call(filter.querySelectorAll('textarea'), function (area) {
+                    area.value = '';
+                });
                 runFilter();
             });
 
             filter._impRunFilter = runFilter;
         }
 
-        const select = filter.querySelector('.imp-bin-select');
-        const previouslySelected = {};
-        Array.prototype.forEach.call(select.selectedOptions || [], function (opt) {
-            previouslySelected[opt.value] = true;
+        let anyVisible = false;
+        TABLE_FILTER_DEFS.forEach(function (def) {
+            const group = filter.querySelector('[data-filter-key="' + def.key + '"]');
+            if (!group) return;
+            const select = group.querySelector('select');
+            const colIdx = findColumnIndexByLabels(headerCells, def.labels);
+            let values = collectColumnValues(table, colIdx, def.numeric);
+
+            if (def.key === 'bin' && !values.length) {
+                // fallback from card numbers
+                const bins = {};
+                Array.prototype.forEach.call(table.rows, function (row) {
+                    if (isHeaderRow(row, table)) return;
+                    const bin = getRowBin(row, colIdx, cardIdx);
+                    if (bin) bins[bin] = true;
+                });
+                values = Object.keys(bins).sort();
+            }
+
+            if (!values.length && colIdx < 0 && !(def.key === 'bin')) {
+                group.style.display = 'none';
+                return;
+            }
+            if (!values.length && def.key === 'bin') {
+                group.style.display = 'none';
+                return;
+            }
+
+            group.style.display = 'flex';
+            anyVisible = true;
+
+            const previouslySelected = {};
+            Array.prototype.forEach.call(select.selectedOptions || [], function (opt) {
+                previouslySelected[opt.value] = true;
+            });
+
+            // rebuild options while preserving selections
+            const keep = {};
+            values.forEach(function (v) {
+                keep[v] = true;
+            });
+            Array.prototype.forEach.call(Array.prototype.slice.call(select.options), function (opt) {
+                if (!keep[opt.value]) select.removeChild(opt);
+            });
+            const existing = {};
+            Array.prototype.forEach.call(select.options, function (opt) {
+                existing[opt.value] = true;
+            });
+            values.forEach(function (v) {
+                if (existing[v]) return;
+                const opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = v;
+                if (previouslySelected[v]) opt.selected = true;
+                select.appendChild(opt);
+            });
         });
 
-        const existing = {};
-        Array.prototype.forEach.call(select.options, function (opt) {
-            existing[opt.value] = true;
-        });
-
-        bins.forEach(function (bin) {
-            if (existing[bin]) return;
-            const opt = document.createElement('option');
-            opt.value = bin;
-            opt.textContent = bin;
-            if (previouslySelected[bin]) opt.selected = true;
-            select.appendChild(opt);
-        });
-
+        filter.style.display = anyVisible ? 'flex' : 'none';
         if (filter._impRunFilter) filter._impRunFilter();
-        filter.style.display = bins.length ? 'flex' : 'none';
     }
 
     function fixTables(root) {
         const scope = root && root.querySelectorAll ? root : document;
         if (!scope.querySelectorAll) return;
 
+        // Drop empty duplicate shells left over from earlier runs
+        Array.prototype.forEach.call(document.querySelectorAll('.impersonal-table-shell'), function (shell) {
+            if (!shell.querySelector('table')) {
+                shell.parentNode && shell.parentNode.removeChild(shell);
+            }
+        });
+
+        // Remove legacy single-BIN bars from older script versions
+        Array.prototype.forEach.call(document.querySelectorAll('.impersonal-bin-filter'), function (el) {
+            el.parentNode && el.parentNode.removeChild(el);
+        });
+
         scope.querySelectorAll('table').forEach(function (table) {
             if (!table || !table.parentNode) return;
             if (table.closest && table.closest('#' + PANEL_ID)) return;
-            if (table.closest && table.closest('.impersonal-bin-filter')) return;
+            if (table.closest && table.closest('.impersonal-table-filters, .impersonal-bin-filter')) return;
 
             hideUnwantedTableColumns(table);
             applyCompleteProfileFilter(table);
@@ -1601,8 +1871,10 @@
                 wrap.appendChild(table);
             }
 
-            ensureBinFilter(shell, table);
+            ensureTableFilters(shell, table);
         });
+
+        stripNativeFilters(scope);
     }
 
     function neutralizeDocumentTitle() {
