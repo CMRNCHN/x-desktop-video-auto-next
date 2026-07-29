@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View (Tor)
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     1.4.0
+// @version     1.4.1
 // @description Tor-safe impersonal restyle: no external fonts/images, offline SVG placeholders, onion-friendly. Use Violentmonkey in Tor Browser.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -592,6 +592,36 @@
             '  font-size: 16px !important;',
             '  font-weight: 700 !important;',
             '  line-height: 1.35 !important;',
+            '  overflow: hidden !important;',
+            '}',
+            'body td .badge,',
+            'body td [class*="badge" i],',
+            'body td span.bg-info,',
+            'body td span[class*="bg-opacity" i],',
+            'body td span.fs-11px,',
+            'body td span.text-info {',
+            '  display: inline-block !important;',
+            '  max-width: 100% !important;',
+            '  width: fit-content !important;',
+            '  box-sizing: border-box !important;',
+            '  white-space: normal !important;',
+            '  overflow-wrap: anywhere !important;',
+            '  word-break: break-word !important;',
+            '  font-size: 10px !important;',
+            '  font-weight: 700 !important;',
+            '  line-height: 1.15 !important;',
+            '  padding: 2px 5px !important;',
+            '  margin: 0 !important;',
+            '  vertical-align: middle !important;',
+            '  border-width: 1px !important;',
+            '}',
+            'body td[data-impersonal-type-col="1"],',
+            'body th[data-impersonal-type-col="1"] {',
+            '  min-width: 4.5rem !important;',
+            '  max-width: 7.5rem !important;',
+            '  width: 7.5rem !important;',
+            '  text-align: center !important;',
+            '  padding: 8px 6px !important;',
             '}',
             'body th {',
             '  background: #d2ccc3 !important;',
@@ -1266,6 +1296,65 @@
                 row.setAttribute('data-impersonal-complete', '0');
                 row.setAttribute('data-impersonal-complete-hidden', '1');
             }
+        });
+    }
+
+    const TYPE_HEADER_LABELS = {
+        TYPE: true,
+        'CARD TYPE': true,
+        CARDTYPE: true,
+        LEVEL: true,
+        'CARD LEVEL': true,
+        CARDLEVEL: true,
+        PRODUCT: true,
+        SCHEME: true,
+        BRAND: true,
+    };
+
+    function markTypeColumns(table) {
+        const headerCells = getTableHeaderCells(table);
+        const typeIdx = findColumnIndexByLabels(headerCells, TYPE_HEADER_LABELS);
+        if (typeIdx < 0) {
+            let best = -1;
+            let bestHits = 0;
+            const sampleRows = Math.min(table.rows.length, 12);
+            for (let c = 0; c < headerCells.length; c++) {
+                let hits = 0;
+                for (let r = 0; r < sampleRows; r++) {
+                    const row = table.rows[r];
+                    if (!row || isHeaderRow(row, table) || !row.cells[c]) continue;
+                    if (row.cells[c].querySelector && row.cells[c].querySelector('.badge, [class*="badge" i], .fs-11px')) {
+                        hits += 1;
+                    }
+                }
+                if (hits > bestHits) {
+                    bestHits = hits;
+                    best = c;
+                }
+            }
+            if (bestHits < 2) return;
+            markColumnCells(table, best);
+            return;
+        }
+        markColumnCells(table, typeIdx);
+    }
+
+    function markColumnCells(table, index) {
+        Array.prototype.forEach.call(table.rows, function (row) {
+            const cell = row.cells[index];
+            if (!cell) return;
+            cell.setAttribute('data-impersonal-type-col', '1');
+            const badges = cell.querySelectorAll
+                ? cell.querySelectorAll('.badge, [class*="badge" i], span.fs-11px, span.text-info, span.bg-info')
+                : [];
+            Array.prototype.forEach.call(badges, function (badge) {
+                badge.style.setProperty('max-width', '100%', 'important');
+                badge.style.setProperty('white-space', 'normal', 'important');
+                badge.style.setProperty('font-size', '10px', 'important');
+                badge.style.setProperty('padding', '2px 5px', 'important');
+                badge.style.setProperty('display', 'inline-block', 'important');
+                badge.style.setProperty('box-sizing', 'border-box', 'important');
+            });
         });
     }
 
