@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     3.10.0
+// @version     3.11.0
 // @description Strips branding and restyles pages to a muted generic look; swaps media for a curated stock set so sites still read like ordinary websites.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -462,9 +462,13 @@
             '  display: flex !important;',
             '  flex-direction: column !important;',
             '  gap: 3px !important;',
-            '  min-width: 110px !important;',
-            '  flex: 1 1 110px !important;',
-            '  max-width: 180px !important;',
+            '  min-width: 120px !important;',
+            '  flex: 1 1 120px !important;',
+            '  max-width: 200px !important;',
+            '}',
+            'body .impersonal-table-filters .imp-filter-group[data-filter-key="bin"] {',
+            '  max-width: 220px !important;',
+            '  flex: 1 1 180px !important;',
             '}',
             'body .impersonal-bin-filter label,',
             'body .impersonal-table-filters label {',
@@ -475,10 +479,8 @@
             '  text-transform: uppercase !important;',
             '  letter-spacing: 0.03em !important;',
             '}',
-            'body .impersonal-bin-filter input[type="search"],',
-            'body .impersonal-bin-filter textarea.imp-bin-search,',
-            'body .impersonal-bin-filter select,',
-            'body .impersonal-table-filters textarea,',
+            'body .impersonal-table-filters input[type="search"],',
+            'body .impersonal-table-filters input[type="text"],',
             'body .impersonal-table-filters select {',
             '  min-width: 0 !important;',
             '  width: 100% !important;',
@@ -492,16 +494,22 @@
             '  font-weight: 700 !important;',
             '  box-sizing: border-box !important;',
             '}',
-            'body .impersonal-bin-filter select[multiple],',
             'body .impersonal-table-filters select[multiple] {',
-            '  min-height: 72px !important;',
-            '}',
-            'body .impersonal-bin-filter textarea.imp-bin-search,',
-            'body .impersonal-table-filters textarea {',
-            '  min-height: 72px !important;',
-            '  resize: vertical !important;',
+            '  min-height: 96px !important;',
             '  font-family: var(--font-mono) !important;',
-            '  line-height: 1.3 !important;',
+            '}',
+            'body .impersonal-table-filters .imp-bin-add-row {',
+            '  display: flex !important;',
+            '  gap: 4px !important;',
+            '  width: 100% !important;',
+            '}',
+            'body .impersonal-table-filters .imp-bin-add-row input {',
+            '  flex: 1 1 auto !important;',
+            '}',
+            'body .impersonal-table-filters .imp-bin-add-row button {',
+            '  flex: 0 0 auto !important;',
+            '  align-self: stretch !important;',
+            '  padding: 5px 8px !important;',
             '}',
             'body .impersonal-bin-filter button,',
             'body .impersonal-table-filters button {',
@@ -1560,6 +1568,9 @@
             .trim();
     }
 
+
+    const BIN_LIST_KEY = 'impersonal-saved-bins-v1';
+
     const TABLE_FILTER_DEFS = [
         {
             key: 'bin',
@@ -1593,6 +1604,58 @@
             numeric: false,
         },
     ];
+
+    function getBinStore() {
+        try {
+            return window.__IMP_BIN_STORE || window.localStorage;
+        } catch (err) {
+            return null;
+        }
+    }
+
+    function loadSavedBins() {
+        const store = getBinStore();
+        if (!store) return [];
+        try {
+            const raw = store.getItem(BIN_LIST_KEY);
+            const parsed = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(parsed)) return [];
+            const out = [];
+            const seen = {};
+            parsed.forEach(function (v) {
+                const bin = String(v || '').replace(/\D/g, '').slice(0, 8);
+                if (bin.length >= 4 && !seen[bin]) {
+                    seen[bin] = true;
+                    out.push(bin);
+                }
+            });
+            return out.sort();
+        } catch (err) {
+            return [];
+        }
+    }
+
+    function saveSavedBins(bins) {
+        const store = getBinStore();
+        if (!store) return;
+        try {
+            store.setItem(BIN_LIST_KEY, JSON.stringify(bins));
+        } catch (err) {
+            // ignore
+        }
+    }
+
+    function upsertSavedBin(bin) {
+        const clean = String(bin || '').replace(/\D/g, '').slice(0, 8);
+        if (clean.length < 4) return null;
+        const list = loadSavedBins();
+        if (list.indexOf(clean) === -1) {
+            list.push(clean);
+            list.sort();
+            saveSavedBins(list);
+        }
+        return clean;
+    }
 
     function collectColumnValues(table, colIdx, numeric) {
         const values = {};
@@ -1633,7 +1696,7 @@
             } else {
                 q = String(q).trim().toLowerCase();
                 if (!q) continue;
-                if (value === q || value.indexOf(q) === 0 || value.indexOf(q) !== -1) return true;
+                if (value === q || value.indexOf(q) !== -1) return true;
             }
         }
         return false;
@@ -1645,15 +1708,26 @@
         const active = [];
 
         TABLE_FILTER_DEFS.forEach(function (def) {
-            const group = filterRoot.querySelector('[data-filter-key="' + def.key + '"]');
+            const group = filterRoot && filterRoot.querySelector('[data-filter-key="' + def.key + '"]');
             if (!group || group.style.display === 'none') return;
-            const select = group.querySelector('select');
-            const area = group.querySelector('textarea');
             const colIdx = findColumnIndexByLabels(headerCells, def.labels);
-            const selected = getMultiSelectValues(select).map(function (v) {
-                return def.numeric ? v.replace(/\D/g, '') : v.toLowerCase();
-            });
-            const typed = def.numeric ? parseBinQueries(area && area.value) : parseTextQueries(area && area.value);
+            let selected = [];
+            let typed = [];
+
+            if (def.key === 'bin') {
+                const select = group.querySelector('select.imp-bin-saved');
+                const addInput = group.querySelector('input.imp-bin-new');
+                selected = getMultiSelectValues(select).map(function (v) {
+                    return v.replace(/\D/g, '');
+                }).filter(Boolean);
+                typed = parseBinQueries(addInput && addInput.value);
+            } else {
+                const input = group.querySelector('input.imp-filter-text');
+                typed = parseTextQueries(input && input.value);
+            }
+
+            if (!selected.length && !typed.length) return;
+
             active.push({
                 def: def,
                 colIdx: colIdx,
@@ -1686,7 +1760,197 @@
                 row.setAttribute('data-impersonal-bin-hidden', '1');
             }
         });
-        return { visible: visible, total: total };
+        return { visible: visible, total: total, activeCount: active.length };
+    }
+
+    function countBodyRows(table) {
+        let n = 0;
+        if (!table || !table.rows) return 0;
+        Array.prototype.forEach.call(table.rows, function (row) {
+            if (!isHeaderRow(row, table)) n += 1;
+        });
+        return n;
+    }
+
+    function purgeExtraFilterBars(keepShell) {
+        Array.prototype.forEach.call(document.querySelectorAll('.impersonal-table-filters, .impersonal-bin-filter'), function (el) {
+            if (keepShell && keepShell.contains(el)) return;
+            el.parentNode && el.parentNode.removeChild(el);
+        });
+        Array.prototype.forEach.call(document.querySelectorAll('.impersonal-table-pager'), function (el) {
+            if (keepShell && keepShell.contains(el)) return;
+            el.parentNode && el.parentNode.removeChild(el);
+        });
+    }
+
+    function rebuildBinSelect(select, selectedMap) {
+        if (!select) return;
+        const bins = loadSavedBins();
+        select.innerHTML = '';
+        bins.forEach(function (bin) {
+            const opt = document.createElement('option');
+            opt.value = bin;
+            opt.textContent = bin;
+            if (selectedMap && selectedMap[bin]) opt.selected = true;
+            select.appendChild(opt);
+        });
+    }
+
+    function ensureTableFilters(shell, table) {
+        // Only one filter bar on the whole page — attached to this shell
+        purgeExtraFilterBars(shell);
+
+        let filter = shell.querySelector('.impersonal-table-filters');
+        if (filter && filter.getAttribute(MARK) !== 'table-filters') {
+            filter.parentNode.removeChild(filter);
+            filter = null;
+        }
+        // Drop legacy duplicates inside shell
+        Array.prototype.forEach.call(shell.querySelectorAll('.impersonal-table-filters, .impersonal-bin-filter'), function (el, idx) {
+            if (idx === 0 && el.classList.contains('impersonal-table-filters') && el.getAttribute(MARK) === 'table-filters') {
+                filter = el;
+            } else if (el !== filter) {
+                el.parentNode && el.parentNode.removeChild(el);
+            }
+        });
+
+        if (!filter) {
+            filter = document.createElement('div');
+            filter.className = 'impersonal-table-filters';
+            filter.setAttribute(MARK, 'table-filters');
+
+            TABLE_FILTER_DEFS.forEach(function (def) {
+                const group = document.createElement('div');
+                group.className = 'imp-filter-group';
+                group.setAttribute('data-filter-key', def.key);
+                if (def.key === 'bin') {
+                    group.innerHTML = [
+                        '<label>BIN</label>',
+                        '<select class="imp-bin-saved" multiple size="5" aria-label="Saved BINs"></select>',
+                        '<div class="imp-bin-add-row">',
+                        '<input class="imp-bin-new" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-label="Add BIN">',
+                        '<button type="button" class="imp-bin-add">Add BIN</button>',
+                        '</div>',
+                    ].join('');
+                } else {
+                    group.innerHTML = [
+                        '<label>' + def.label + '</label>',
+                        '<input class="imp-filter-text" type="search" autocomplete="off" spellcheck="false" aria-label="Filter by ' + def.label + '">',
+                    ].join('');
+                }
+                filter.appendChild(group);
+            });
+
+            const actions = document.createElement('div');
+            actions.className = 'imp-filter-group';
+            actions.innerHTML = '<label>&nbsp;</label><button type="button" class="imp-filter-clear">Clear filters</button><span class="imp-filter-count"></span>';
+            filter.appendChild(actions);
+            shell.insertBefore(filter, shell.firstChild);
+
+            function runFilter() {
+                const stats = applyColumnFilters(table, filter);
+                const countEl = filter.querySelector('.imp-filter-count');
+                if (countEl) countEl.textContent = stats.visible + ' / ' + stats.total + ' rows';
+                if (shell._impRefreshPager) shell._impRefreshPager();
+                if (stats.activeCount > 0 && stats.visible === 0) {
+                    skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'filter');
+                }
+            }
+
+            filter.addEventListener('change', runFilter);
+            filter.addEventListener('input', runFilter);
+
+            const addBtn = filter.querySelector('.imp-bin-add');
+            const addInput = filter.querySelector('.imp-bin-new');
+            const binSelect = filter.querySelector('select.imp-bin-saved');
+
+            function addBinFromInput(offerSave) {
+                const raw = (addInput && addInput.value) || '';
+                const bins = parseBinQueries(raw);
+                if (!bins.length) return;
+                const selectedMap = {};
+                Array.prototype.forEach.call(binSelect.selectedOptions || [], function (opt) {
+                    selectedMap[opt.value] = true;
+                });
+                bins.forEach(function (bin) {
+                    const existing = loadSavedBins();
+                    const known = existing.indexOf(bin) !== -1;
+                    if (!known && offerSave) {
+                        const ok = window.confirm('Save BIN ' + bin + ' to your list?');
+                        if (ok) upsertSavedBin(bin);
+                        else {
+                            // temporary option for this session only
+                            let found = false;
+                            Array.prototype.forEach.call(binSelect.options, function (opt) {
+                                if (opt.value === bin) found = true;
+                            });
+                            if (!found) {
+                                const opt = document.createElement('option');
+                                opt.value = bin;
+                                opt.textContent = bin + ' (temp)';
+                                opt.selected = true;
+                                binSelect.appendChild(opt);
+                            }
+                            selectedMap[bin] = true;
+                            return;
+                        }
+                    } else if (!known) {
+                        upsertSavedBin(bin);
+                    }
+                    selectedMap[bin] = true;
+                });
+                rebuildBinSelect(binSelect, selectedMap);
+                if (addInput) addInput.value = '';
+                runFilter();
+            }
+
+            if (addBtn) {
+                addBtn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    addBinFromInput(true);
+                });
+            }
+            if (addInput) {
+                addInput.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addBinFromInput(true);
+                    }
+                });
+            }
+
+            filter.querySelector('.imp-filter-clear').addEventListener('click', function (e) {
+                e.preventDefault();
+                Array.prototype.forEach.call(filter.querySelectorAll('select option'), function (opt) {
+                    opt.selected = false;
+                });
+                Array.prototype.forEach.call(filter.querySelectorAll('input.imp-filter-text, input.imp-bin-new'), function (input) {
+                    input.value = '';
+                });
+                runFilter();
+            });
+
+            filter._impRunFilter = runFilter;
+            rebuildBinSelect(binSelect, {});
+        } else {
+            // ensure bin select reflects saved list without wiping selection
+            const binSelect = filter.querySelector('select.imp-bin-saved');
+            if (binSelect) {
+                const selectedMap = {};
+                Array.prototype.forEach.call(binSelect.selectedOptions || [], function (opt) {
+                    selectedMap[opt.value] = true;
+                });
+                rebuildBinSelect(binSelect, selectedMap);
+            }
+        }
+
+        // Show all filter groups (no auto-hide / no prefilled column options)
+        TABLE_FILTER_DEFS.forEach(function (def) {
+            const group = filter.querySelector('[data-filter-key="' + def.key + '"]');
+            if (group) group.style.display = 'flex';
+        });
+        filter.style.display = 'flex';
+        if (filter._impRunFilter) filter._impRunFilter();
     }
 
     function stripNativeFilters(root) {
@@ -1751,134 +2015,6 @@
                 prev = prev.previousElementSibling;
             }
         });
-    }
-
-    function ensureTableFilters(shell, table) {
-        // Remove duplicates / legacy bars — only one filter UI per shell
-        const existingBars = shell.querySelectorAll('.impersonal-bin-filter, .impersonal-table-filters');
-        let filter = null;
-        Array.prototype.forEach.call(existingBars, function (el) {
-            if (!filter && el.classList.contains('impersonal-table-filters') && el.getAttribute(MARK) === 'table-filters') {
-                filter = el;
-            } else {
-                el.parentNode && el.parentNode.removeChild(el);
-            }
-        });
-
-        const headerCells = getTableHeaderCells(table);
-        const cardIdx = findColumnIndexByLabels(headerCells, CARD_HEADER_LABELS);
-
-        if (!filter) {
-            filter = document.createElement('div');
-            filter.className = 'impersonal-table-filters';
-            filter.setAttribute(MARK, 'table-filters');
-
-            TABLE_FILTER_DEFS.forEach(function (def) {
-                const group = document.createElement('div');
-                group.className = 'imp-filter-group';
-                group.setAttribute('data-filter-key', def.key);
-                group.innerHTML = [
-                    '<label>' + def.label + '</label>',
-                    '<select class="imp-filter-select" multiple size="4" aria-label="Filter by ' + def.label + '"></select>',
-                    '<textarea class="imp-filter-text" rows="3" spellcheck="false" placeholder="' +
-                        (def.numeric ? 'Multiple OK\n411111, 424242' : 'Multiple OK\nvalue1, value2') +
-                        '" aria-label="' + def.label + ' list filter"></textarea>',
-                ].join('');
-                filter.appendChild(group);
-            });
-
-            const actions = document.createElement('div');
-            actions.className = 'imp-filter-group';
-            actions.innerHTML = '<label>&nbsp;</label><button type="button" class="imp-filter-clear">Clear filters</button><span class="imp-filter-count"></span>';
-            filter.appendChild(actions);
-            shell.insertBefore(filter, shell.firstChild);
-
-            function runFilter() {
-                const stats = applyColumnFilters(table, filter);
-                const countEl = filter.querySelector('.imp-filter-count');
-                if (countEl) countEl.textContent = stats.visible + ' / ' + stats.total + ' rows';
-                if (shell._impRefreshPager) shell._impRefreshPager();
-                if (stats.visible === 0) {
-                    skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'filter');
-                }
-            }
-
-            filter.addEventListener('change', runFilter);
-            filter.addEventListener('input', runFilter);
-            filter.querySelector('.imp-filter-clear').addEventListener('click', function (e) {
-                e.preventDefault();
-                Array.prototype.forEach.call(filter.querySelectorAll('select option'), function (opt) {
-                    opt.selected = false;
-                });
-                Array.prototype.forEach.call(filter.querySelectorAll('textarea'), function (area) {
-                    area.value = '';
-                });
-                runFilter();
-            });
-
-            filter._impRunFilter = runFilter;
-        }
-
-        let anyVisible = false;
-        TABLE_FILTER_DEFS.forEach(function (def) {
-            const group = filter.querySelector('[data-filter-key="' + def.key + '"]');
-            if (!group) return;
-            const select = group.querySelector('select');
-            const colIdx = findColumnIndexByLabels(headerCells, def.labels);
-            let values = collectColumnValues(table, colIdx, def.numeric);
-
-            if (def.key === 'bin' && !values.length) {
-                // fallback from card numbers
-                const bins = {};
-                Array.prototype.forEach.call(table.rows, function (row) {
-                    if (isHeaderRow(row, table)) return;
-                    const bin = getRowBin(row, colIdx, cardIdx);
-                    if (bin) bins[bin] = true;
-                });
-                values = Object.keys(bins).sort();
-            }
-
-            if (!values.length && colIdx < 0 && !(def.key === 'bin')) {
-                group.style.display = 'none';
-                return;
-            }
-            if (!values.length && def.key === 'bin') {
-                group.style.display = 'none';
-                return;
-            }
-
-            group.style.display = 'flex';
-            anyVisible = true;
-
-            const previouslySelected = {};
-            Array.prototype.forEach.call(select.selectedOptions || [], function (opt) {
-                previouslySelected[opt.value] = true;
-            });
-
-            // rebuild options while preserving selections
-            const keep = {};
-            values.forEach(function (v) {
-                keep[v] = true;
-            });
-            Array.prototype.forEach.call(Array.prototype.slice.call(select.options), function (opt) {
-                if (!keep[opt.value]) select.removeChild(opt);
-            });
-            const existing = {};
-            Array.prototype.forEach.call(select.options, function (opt) {
-                existing[opt.value] = true;
-            });
-            values.forEach(function (v) {
-                if (existing[v]) return;
-                const opt = document.createElement('option');
-                opt.value = v;
-                opt.textContent = v;
-                if (previouslySelected[v]) opt.selected = true;
-                select.appendChild(opt);
-            });
-        });
-
-        filter.style.display = anyVisible ? 'flex' : 'none';
-        if (filter._impRunFilter) filter._impRunFilter();
     }
 
 
@@ -1949,6 +2085,9 @@
             '[class*="dataTables_paginate" i]',
             '[aria-label*="pagination" i]',
             '[class*="pager" i]',
+            '[class*="paginate" i]',
+            '.page-numbers',
+            '.paging',
         ].join(',');
 
         let best = null;
@@ -2155,17 +2294,28 @@
             return false;
         }
 
+        const pagesUnknown = pages.length === 0;
+        const softMax = pagesUnknown ? Math.max(current + 20, maxPage) : maxPage;
+
         return {
             kind: root ? 'links' : 'url',
             getInfo: function () {
-                return { page: current, pages: maxPage, length: 0 };
+                return { page: current, pages: softMax, length: 0, unknown: pagesUnknown };
             },
             goPage: function (page1) {
                 const target = Math.max(1, page1 | 0);
                 if (target === current) return false;
                 if (clickLink(function (L) { return L.page === target; })) return true;
+                // Try any same-page-number control in the whole document
+                const all = collectPagerLinks(document.body);
+                for (let i = 0; i < all.length; i++) {
+                    if (all[i].page === target && all[i].el && !all[i].disabled) {
+                        all[i].el.click();
+                        return true;
+                    }
+                }
                 const href = buildUrlPageHref(target);
-                if (href && href !== window.location.href) {
+                if (href) {
                     window.location.assign(href);
                     return true;
                 }
@@ -2173,28 +2323,39 @@
             },
             goNext: function () {
                 if (clickLink(function (L) { return L.isNext && !L.disabled; })) return true;
+                const all = collectPagerLinks(document.body);
+                for (let i = 0; i < all.length; i++) {
+                    if (all[i].isNext && all[i].el && !all[i].disabled) {
+                        all[i].el.click();
+                        return true;
+                    }
+                }
                 return this.goPage(current + 1);
             },
             goLast: function () {
                 if (clickLink(function (L) { return L.isLast && !L.disabled; })) return true;
+                const all = collectPagerLinks(document.body);
+                for (let i = 0; i < all.length; i++) {
+                    if (all[i].isLast && all[i].el && !all[i].disabled) {
+                        all[i].el.click();
+                        return true;
+                    }
+                }
+                if (pagesUnknown) return this.goPage(current + 20);
                 return this.goPage(maxPage);
             },
             previewPages: function () {
                 const out = [];
-                for (let i = 1; i <= PAGER_PREVIEW_COUNT; i++) {
-                    const p = current + i;
-                    if (p > maxPage) break;
-                    out.push({ page: p, matches: null });
-                }
-                // Prefer explicit numbered links when available
                 if (pages.length) {
-                    const fromLinks = [];
                     for (let i = 0; i < pages.length; i++) {
-                        if (pages[i] > current && fromLinks.length < PAGER_PREVIEW_COUNT) {
-                            fromLinks.push({ page: pages[i], matches: null });
+                        if (pages[i] > current && out.length < PAGER_PREVIEW_COUNT) {
+                            out.push({ page: pages[i], matches: null });
                         }
                     }
-                    if (fromLinks.length) return fromLinks;
+                    if (out.length) return out;
+                }
+                for (let i = 1; i <= PAGER_PREVIEW_COUNT; i++) {
+                    out.push({ page: current + i, matches: null });
                 }
                 return out;
             },
@@ -2329,23 +2490,7 @@
             else el.parentNode && el.parentNode.removeChild(el);
         });
 
-        const driver = createPagerDriver(table);
-        const info = driver.getInfo();
-        // Always show pager when any native pager existed or pages > 1 or URL has page param
-        const urlHasPage = (function () {
-            try {
-                const u = new URL(window.location.href);
-                return u.searchParams.has('page') || u.searchParams.has('p') || u.searchParams.has('pg');
-            } catch (err) {
-                return false;
-            }
-        })();
-        const native = findNativePagerRoot(table);
-        if (!native && info.pages <= 1 && !urlHasPage && driver.kind !== 'datatable') {
-            if (pager) pager.style.display = 'none';
-            return;
-        }
-
+        // Always show pager for the primary data table
         if (!pager) {
             pager = document.createElement('div');
             pager.className = 'impersonal-table-pager';
@@ -2366,15 +2511,22 @@
 
             async function goAndMaybeSkip(action) {
                 const d = createPagerDriver(table);
-                const before = d.getInfo().page;
-                const ok = action(d);
-                if (!ok) return;
-                if (d.kind === 'datatable' || d.kind === 'links') {
-                    await waitForPageSettle(table, 900);
-                    refreshTableAfterPageChange(table);
-                    await skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'nav');
+                let ok = action(d);
+                if (!ok) {
+                    // Hard fallback: always try bumping ?page=
+                    const info = d.getInfo();
+                    const href = buildUrlPageHref(info.page + 1);
+                    if (href && href !== window.location.href) {
+                        writeSkipState({ hops: 0, reason: 'fallback-next' });
+                        window.location.assign(href);
+                    }
+                    return;
                 }
-                // url navigations continue after reload
+                // If navigation started, don't wait on this document
+                if (d.kind === 'url') return;
+                await waitForPageSettle(table, 900);
+                refreshTableAfterPageChange(table);
+                await skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'nav');
                 if (shell._impRefreshPager) shell._impRefreshPager();
             }
 
@@ -2412,10 +2564,10 @@
             const stats = countVisibleTableRows(table);
 
             if (status) {
-                status.textContent = 'Page ' + inf.page + ' / ' + inf.pages + ' · ' + stats.visible + ' match' + (stats.visible === 1 ? '' : 'es');
+                status.textContent = (inf.unknown ? ('Page ' + inf.page) : ('Page ' + inf.page + ' / ' + inf.pages)) + ' · ' + stats.visible + ' match' + (stats.visible === 1 ? '' : 'es');
             }
-            if (nextBtn) nextBtn.disabled = inf.page >= inf.pages;
-            if (lastBtn) lastBtn.disabled = inf.page >= inf.pages;
+            if (nextBtn) nextBtn.disabled = !inf.unknown && inf.page >= inf.pages;
+            if (lastBtn) lastBtn.disabled = !inf.unknown && inf.page >= inf.pages;
             if (jumpInput) {
                 jumpInput.max = String(inf.pages);
                 jumpInput.placeholder = String(inf.page);
@@ -2491,6 +2643,7 @@
             el.parentNode && el.parentNode.removeChild(el);
         });
 
+        const candidateTables = [];
         scope.querySelectorAll('table').forEach(function (table) {
             if (!table || !table.parentNode) return;
             if (table.closest && table.closest('#' + PANEL_ID)) return;
@@ -2534,9 +2687,18 @@
                 wrap.appendChild(table);
             }
 
-            ensureTableFilters(shell, table);
-            ensureTablePager(shell, table);
+            candidateTables.push({ table: table, shell: shell, rows: countBodyRows(table) });
         });
+
+        candidateTables.sort(function (a, b) { return b.rows - a.rows; });
+        const primary = candidateTables[0] || null;
+        if (primary && primary.rows > 0) {
+            purgeExtraFilterBars(primary.shell);
+            ensureTableFilters(primary.shell, primary.table);
+            ensureTablePager(primary.shell, primary.table);
+        } else {
+            purgeExtraFilterBars(null);
+        }
 
         stripNativeFilters(scope);
         stripNativePagination(scope);
