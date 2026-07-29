@@ -1507,6 +1507,7 @@
 
             hideUnwantedTableColumns(table);
             applyCompleteProfileFilter(table);
+            markTypeColumns(table);
 
             let wrap = table.parentElement;
             let shell = null;
