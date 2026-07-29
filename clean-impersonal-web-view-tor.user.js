@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View (Tor)
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     1.1.0
+// @version     1.2.0
 // @description Tor-safe impersonal restyle: no external fonts/images, offline SVG placeholders, onion-friendly. Use Violentmonkey in Tor Browser.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -971,6 +971,90 @@
         });
     }
 
+    const HIDDEN_TABLE_HEADERS = {
+        DL: true,
+        EMAIL: true,
+        PASSWORD: true,
+        'PHONE NUMBER': true,
+        PHONENUMBER: true,
+        PHONE: true,
+        IP: true,
+        'USER AGENT': true,
+        USERAGENT: true,
+        PRICE: true,
+        VENDOR: true,
+        MMN: true,
+        ITEM: true,
+    };
+
+    function normalizeHeaderLabel(text) {
+        return String(text || '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toUpperCase();
+    }
+
+    function headerShouldHide(text) {
+        const label = normalizeHeaderLabel(text);
+        if (!label) return false;
+        if (HIDDEN_TABLE_HEADERS[label]) return true;
+        const compact = label.replace(/\s+/g, '');
+        return !!HIDDEN_TABLE_HEADERS[compact];
+    }
+
+    function hideUnwantedTableColumns(table) {
+        const headerCells = [];
+        const theadRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
+        if (theadRow) {
+            Array.prototype.forEach.call(theadRow.cells, function (cell) {
+                headerCells.push(cell);
+            });
+        } else {
+            const firstRow = table.querySelector('tr');
+            if (firstRow) {
+                Array.prototype.forEach.call(firstRow.cells, function (cell) {
+                    if (cell.tagName === 'TH') headerCells.push(cell);
+                });
+                if (!headerCells.length) {
+                    Array.prototype.forEach.call(firstRow.cells, function (cell) {
+                        headerCells.push(cell);
+                    });
+                }
+            }
+        }
+
+        if (!headerCells.length) return;
+
+        const hideIdx = [];
+        headerCells.forEach(function (cell, index) {
+            const label = cell.innerText || cell.textContent || '';
+            if (headerShouldHide(label)) hideIdx.push(index);
+        });
+
+        if (!hideIdx.length) {
+            table.setAttribute(MARK + '-cols', 'done');
+            return;
+        }
+
+        const hideSet = {};
+        hideIdx.forEach(function (i) {
+            hideSet[i] = true;
+        });
+
+        Array.prototype.forEach.call(table.rows, function (row) {
+            Array.prototype.forEach.call(row.cells, function (cell, index) {
+                if (!hideSet[index]) return;
+                cell.style.setProperty('display', 'none', 'important');
+                cell.setAttribute('data-impersonal-col-hidden', '1');
+                cell.setAttribute('aria-hidden', 'true');
+            });
+        });
+
+        table.setAttribute(MARK + '-cols', 'done');
+    }
+
     function fixTables(root) {
         const scope = root && root.querySelectorAll ? root : document;
         if (!scope.querySelectorAll) return;
@@ -978,16 +1062,18 @@
         scope.querySelectorAll('table').forEach(function (table) {
             if (!table || !table.parentNode) return;
             if (table.closest && table.closest('#' + PANEL_ID)) return;
-            if (table.parentElement && table.parentElement.classList.contains('impersonal-table-wrap')) {
-                return;
-            }
-            if (table.closest && table.closest('.impersonal-table-wrap')) return;
 
-            const wrap = document.createElement('div');
-            wrap.className = 'impersonal-table-wrap';
-            wrap.setAttribute(MARK, 'table');
-            table.parentNode.insertBefore(wrap, table);
-            wrap.appendChild(table);
+            const alreadyWrapped =
+                table.parentElement && table.parentElement.classList.contains('impersonal-table-wrap');
+            if (!alreadyWrapped) {
+                const wrap = document.createElement('div');
+                wrap.className = 'impersonal-table-wrap';
+                wrap.setAttribute(MARK, 'table');
+                table.parentNode.insertBefore(wrap, table);
+                wrap.appendChild(table);
+            }
+
+            hideUnwantedTableColumns(table);
         });
     }
 
