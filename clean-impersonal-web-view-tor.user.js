@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View (Tor)
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     1.10.0
+// @version     1.11.0
 // @description Tor-safe impersonal restyle: no external fonts/images, offline SVG placeholders, onion-friendly. Use Violentmonkey in Tor Browser.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -1966,7 +1966,10 @@
                 if (countEl) countEl.textContent = stats.visible + ' / ' + stats.total + ' rows';
                 if (shell._impRefreshPager) shell._impRefreshPager();
                 if (stats.activeCount > 0 && stats.visible === 0) {
-                    skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'filter');
+                    clearTimeout(shell._impSkipTimer);
+                    shell._impSkipTimer = setTimeout(function () {
+                        skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'filter');
+                    }, 400);
                 }
             }
 
@@ -2180,6 +2183,14 @@
         return null;
     }
 
+    function isOurChrome(el) {
+        if (!el) return true;
+        if (el.closest) {
+            return !!el.closest('.impersonal-table-shell .impersonal-table-pager, .impersonal-table-pager, .impersonal-table-filters, .impersonal-bin-filter, #' + PANEL_ID);
+        }
+        return false;
+    }
+
     function findNativePagerRoot(table) {
         const shell = table.closest && table.closest('.impersonal-table-shell');
         const scopes = [];
@@ -2194,11 +2205,9 @@
             '.dataTables_paginate',
             'ul.pagination',
             'nav.pagination',
-            '.pagination',
+            '.pagination:not(.impersonal-table-pager)',
             '[class*="dataTables_paginate" i]',
             '[aria-label*="pagination" i]',
-            '[class*="pager" i]',
-            '[class*="paginate" i]',
             '.page-numbers',
             '.paging',
         ].join(',');
@@ -2214,8 +2223,8 @@
                 return;
             }
             Array.prototype.forEach.call(nodes, function (el) {
-                if (!el || (el.closest && el.closest('.impersonal-table-pager, #' + PANEL_ID))) return;
-                if (el.classList && el.classList.contains('impersonal-table-pager')) return;
+                if (!el || isOurChrome(el)) return;
+                if (/impersonal/i.test(String(el.className || '') + String(el.id || ''))) return;
                 const rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
                 const tRect = table.getBoundingClientRect ? table.getBoundingClientRect() : null;
                 let dist = 9999;
@@ -2232,18 +2241,21 @@
     function collectPagerLinks(root) {
         if (!root) return [];
         const links = [];
-        const nodes = root.querySelectorAll('a, button, span[data-dt-idx], li a, .paginate_button');
+        const nodes = root.querySelectorAll('a, button, span[data-dt-idx], li > a, li > button, .paginate_button');
         Array.prototype.forEach.call(nodes, function (el) {
+            if (isOurChrome(el)) return;
             const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
             const href = el.getAttribute && (el.getAttribute('href') || el.getAttribute('data-href')) || '';
             const page = parsePageNumber(text, href);
-            const low = text.toLowerCase();
             const rel = ((el.getAttribute && el.getAttribute('rel')) || '').toLowerCase();
-            const isNext = rel === 'next' || /^(next|›|»|>|→)$/i.test(text) || /next/i.test(el.className || '');
-            const isPrev = rel === 'prev' || /^(prev|previous|‹|«|<|←)$/i.test(text) || /prev/i.test(el.className || '');
-            const isLast = /^(last|»»|≫)$/i.test(text) || /last/i.test(el.className || '');
-            const isFirst = /^(first|««|≪)$/i.test(text) || /first/i.test(el.className || '');
+            const cls = String(el.className || '').toLowerCase();
+            // Avoid matching our own "Next page" via loose /next/ class checks
+            const isNext = rel === 'next' || /^(next|next page|›|»|>|→)$/i.test(text) || /(^|\s)(next|paginate_button\s+next)(\s|$)/i.test(cls);
+            const isPrev = rel === 'prev' || /^(prev|previous|previous page|‹|«|<|←)$/i.test(text) || /(^|\s)(previous|prev|paginate_button\s+previous)(\s|$)/i.test(cls);
+            const isLast = /^(last|last page|»»|≫)$/i.test(text) || /(^|\s)last(\s|$)/i.test(cls);
+            const isFirst = /^(first|first page|««|≪)$/i.test(text) || /(^|\s)first(\s|$)/i.test(cls);
             const disabled = el.classList && (el.classList.contains('disabled') || el.classList.contains('current') || el.classList.contains('active'));
+            const ariaDisabled = el.getAttribute && el.getAttribute('aria-disabled') === 'true';
             links.push({
                 el: el,
                 text: text,
@@ -2253,7 +2265,7 @@
                 isPrev: isPrev,
                 isLast: isLast,
                 isFirst: isFirst,
-                disabled: !!disabled || el.hasAttribute('disabled'),
+                disabled: !!disabled || !!ariaDisabled || el.hasAttribute('disabled'),
             });
         });
         return links;
@@ -2418,8 +2430,12 @@
             goPage: function (page1) {
                 const target = Math.max(1, page1 | 0);
                 if (target === current) return false;
+                const href = buildUrlPageHref(target);
+                if (href && href !== window.location.href) {
+                    window.location.assign(href);
+                    return true;
+                }
                 if (clickLink(function (L) { return L.page === target; })) return true;
-                // Try any same-page-number control in the whole document
                 const all = collectPagerLinks(document.body);
                 for (let i = 0; i < all.length; i++) {
                     if (all[i].page === target && all[i].el && !all[i].disabled) {
@@ -2427,14 +2443,14 @@
                         return true;
                     }
                 }
-                const href = buildUrlPageHref(target);
-                if (href) {
-                    window.location.assign(href);
-                    return true;
-                }
                 return false;
             },
             goNext: function () {
+                const href = buildUrlPageHref(current + 1);
+                if (href && href !== window.location.href) {
+                    window.location.assign(href);
+                    return true;
+                }
                 if (clickLink(function (L) { return L.isNext && !L.disabled; })) return true;
                 const all = collectPagerLinks(document.body);
                 for (let i = 0; i < all.length; i++) {
@@ -2443,7 +2459,7 @@
                         return true;
                     }
                 }
-                return this.goPage(current + 1);
+                return false;
             },
             goLast: function () {
                 if (clickLink(function (L) { return L.isLast && !L.disabled; })) return true;
@@ -2538,17 +2554,49 @@
         tintNumbers(table);
     }
 
+    function hasActiveColumnFilters(shell) {
+        const filter = shell && shell.querySelector && shell.querySelector('.impersonal-table-filters');
+        if (!filter) return false;
+        const binSel = filter.querySelector('select.imp-bin-saved');
+        if (binSel && binSel.selectedOptions && binSel.selectedOptions.length) return true;
+        const binNew = filter.querySelector('input.imp-bin-new');
+        if (binNew && String(binNew.value || '').replace(/\D/g, '').length >= 4) return true;
+        const inputs = filter.querySelectorAll('input.imp-filter-text');
+        for (let i = 0; i < inputs.length; i++) {
+            if (String(inputs[i].value || '').trim()) return true;
+        }
+        return false;
+    }
+
+    function pageFingerprint(table, driver) {
+        const info = driver && driver.getInfo ? driver.getInfo() : { page: 0 };
+        const href = String(window.location.href || '');
+        const body = table && table.tBodies && table.tBodies[0] ? table.tBodies[0].innerText : (table && table.innerText) || '';
+        return info.page + '|' + href + '|' + String(body).replace(/\s+/g, ' ').slice(0, 240);
+    }
+
+    function navigateToPageNumber(page1) {
+        const target = Math.max(1, page1 | 0);
+        const href = buildUrlPageHref(target);
+        if (!href || href === window.location.href) return false;
+        writeSkipState({ hops: (readSkipState() && readSkipState().hops) || 0, reason: 'nav', target: target });
+        window.location.assign(href);
+        return true;
+    }
+
     async function skipEmptyFilteredPages(shell, table, driver, reason) {
         if (!shell || !driver || shell._impPagerSkipping) return;
+        // Only skip when the user has BIN/city/etc filters active — not for completeness-only empties
+        if (!hasActiveColumnFilters(shell) && reason !== 'continue') {
+            writeSkipState(null);
+            return;
+        }
         const stats = countVisibleTableRows(table);
         if (stats.visible > 0) {
             writeSkipState(null);
             return;
         }
-        if (stats.total === 0 && driver.kind === 'url') {
-            // still loading?
-            return;
-        }
+        if (stats.total === 0) return;
 
         shell._impPagerSkipping = true;
         const note = shell.querySelector('.imp-pager-note');
@@ -2556,32 +2604,44 @@
         const skipState = readSkipState() || { hops: 0, reason: reason || 'empty' };
         try {
             while (hops < PAGER_MAX_SKIPS) {
-                const info = driver.getInfo();
-                if (info.page >= info.pages) break;
+                let d = createPagerDriver(table);
+                const info = d.getInfo();
+                if (!info.unknown && info.page >= info.pages) break;
                 hops += 1;
                 skipState.hops = (skipState.hops || 0) + 1;
                 writeSkipState(skipState);
-                if (note) note.textContent = 'No matches on this page — skipping to page ' + (info.page + 1) + '…';
-                const moved = driver.goNext();
-                if (!moved) break;
-                if (driver.kind === 'url' || driver.kind === 'links') {
-                    // full navigation or click may reload — stop here; next load continues
-                    if (driver.kind === 'url') break;
-                    await waitForPageSettle(table, 1000);
-                    refreshTableAfterPageChange(table);
-                } else {
-                    await waitForPageSettle(table, 700);
-                    refreshTableAfterPageChange(table);
+                if (note) note.textContent = 'No filter matches — going to page ' + (info.page + 1) + '…';
+
+                const before = pageFingerprint(table, d);
+                // Prefer hard URL navigation so we never "skip in place" by clicking our own UI
+                const movedUrl = navigateToPageNumber(info.page + 1);
+                if (movedUrl) break;
+
+                const moved = d.goNext();
+                if (!moved) {
+                    if (note) note.textContent = 'Could not advance to the next page.';
+                    writeSkipState(null);
+                    break;
                 }
+                if (d.kind === 'url') break;
+
+                await waitForPageSettle(table, 1100);
+                refreshTableAfterPageChange(table);
+                d = createPagerDriver(table);
+                const after = pageFingerprint(table, d);
+                if (after === before) {
+                    // Click did nothing — force URL bump once, then stop if that also fails
+                    if (!navigateToPageNumber(info.page + 1)) {
+                        if (note) note.textContent = 'Next page control did not change the table.';
+                        writeSkipState(null);
+                    }
+                    break;
+                }
+
                 const nextStats = countVisibleTableRows(table);
                 if (nextStats.visible > 0) {
                     writeSkipState(null);
-                    if (note) note.textContent = 'Skipped ' + hops + ' empty page' + (hops === 1 ? '' : 's') + ' to find matches.';
-                    break;
-                }
-                if (driver.getInfo().page >= driver.getInfo().pages) {
-                    if (note) note.textContent = 'No matching rows on remaining pages.';
-                    writeSkipState(null);
+                    if (note) note.textContent = 'Skipped ' + hops + ' empty page' + (hops === 1 ? '' : 's') + '.';
                     break;
                 }
             }
@@ -2622,41 +2682,69 @@
             ].join('');
             shell.appendChild(pager);
 
-            async function goAndMaybeSkip(action) {
+            async function goAndMaybeSkip(action, mode) {
                 const d = createPagerDriver(table);
+                const before = pageFingerprint(table, d);
+                const info = d.getInfo();
+
+                // Prefer URL page changes for Next / Jump — most reliable across sites
+                if (mode === 'next') {
+                    if (navigateToPageNumber(info.page + 1)) return;
+                } else if (mode === 'last') {
+                    const target = info.unknown ? info.page + 20 : info.pages;
+                    if (navigateToPageNumber(target)) return;
+                } else if (mode === 'jump') {
+                    // action handles jump via goPage; still try URL if click fails
+                }
+
                 let ok = action(d);
+                if (!ok && mode === 'jump') {
+                    const input = pager.querySelector('.imp-pager-jump-input');
+                    const page = parseInt(input && input.value, 10);
+                    if (page && navigateToPageNumber(page)) return;
+                }
                 if (!ok) {
-                    // Hard fallback: always try bumping ?page=
-                    const info = d.getInfo();
-                    const href = buildUrlPageHref(info.page + 1);
-                    if (href && href !== window.location.href) {
-                        writeSkipState({ hops: 0, reason: 'fallback-next' });
-                        window.location.assign(href);
+                    if (navigateToPageNumber(info.page + 1)) return;
+                    const note = pager.querySelector('.imp-pager-note');
+                    if (note) note.textContent = 'Could not change page.';
+                    return;
+                }
+                if (d.kind === 'url') return;
+
+                await waitForPageSettle(table, 1100);
+                refreshTableAfterPageChange(table);
+                const after = pageFingerprint(table, createPagerDriver(table));
+                if (after === before) {
+                    // Click was a no-op (often our own control) — force URL navigation
+                    if (mode === 'jump') {
+                        const input = pager.querySelector('.imp-pager-jump-input');
+                        const page = parseInt(input && input.value, 10);
+                        if (page) navigateToPageNumber(page);
+                    } else {
+                        navigateToPageNumber(info.page + (mode === 'last' ? 20 : 1));
                     }
                     return;
                 }
-                // If navigation started, don't wait on this document
-                if (d.kind === 'url') return;
-                await waitForPageSettle(table, 900);
-                refreshTableAfterPageChange(table);
-                await skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'nav');
+                if (hasActiveColumnFilters(shell)) {
+                    await skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'nav');
+                }
                 if (shell._impRefreshPager) shell._impRefreshPager();
             }
 
             pager.querySelector('.imp-pager-next').addEventListener('click', function (e) {
                 e.preventDefault();
-                goAndMaybeSkip(function (d) { return d.goNext(); });
+                goAndMaybeSkip(function (d) { return d.goNext(); }, 'next');
             });
             pager.querySelector('.imp-pager-last').addEventListener('click', function (e) {
                 e.preventDefault();
-                goAndMaybeSkip(function (d) { return d.goLast(); });
+                goAndMaybeSkip(function (d) { return d.goLast(); }, 'last');
             });
             pager.querySelector('.imp-pager-jump-go').addEventListener('click', function (e) {
                 e.preventDefault();
                 const input = pager.querySelector('.imp-pager-jump-input');
                 const page = parseInt(input && input.value, 10);
                 if (!page) return;
-                goAndMaybeSkip(function (d) { return d.goPage(page); });
+                goAndMaybeSkip(function (d) { return d.goPage(page); }, 'jump');
             });
             pager.querySelector('.imp-pager-jump-input').addEventListener('keydown', function (e) {
                 if (e.key === 'Enter') {
@@ -2715,11 +2803,21 @@
                 btn.addEventListener('click', function (e) {
                     e.preventDefault();
                     (async function () {
+                        if (navigateToPageNumber(item.page)) return;
                         const drv = createPagerDriver(table);
-                        if (!drv.goPage(item.page)) return;
-                        if (drv.kind === 'datatable' || drv.kind === 'links') {
-                            await waitForPageSettle(table, 900);
-                            refreshTableAfterPageChange(table);
+                        const before = pageFingerprint(table, drv);
+                        if (!drv.goPage(item.page)) {
+                            navigateToPageNumber(item.page);
+                            return;
+                        }
+                        if (drv.kind === 'url') return;
+                        await waitForPageSettle(table, 1100);
+                        refreshTableAfterPageChange(table);
+                        if (pageFingerprint(table, createPagerDriver(table)) === before) {
+                            navigateToPageNumber(item.page);
+                            return;
+                        }
+                        if (hasActiveColumnFilters(shell)) {
                             await skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'preview');
                         }
                         refreshPager();
@@ -2733,11 +2831,15 @@
         shell._impRefreshPager = refreshPager;
         refreshPager();
 
-        // Continue skip after navigation reload, or skip current empty page once filters applied
+        // Only continue an in-progress filter skip after a real navigation — never auto-skip on load
         const pending = readSkipState();
-        setTimeout(function () {
-            skipEmptyFilteredPages(shell, table, createPagerDriver(table), pending ? 'continue' : 'autoload');
-        }, 250);
+        if (pending && hasActiveColumnFilters(shell)) {
+            setTimeout(function () {
+                skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'continue');
+            }, 350);
+        } else if (pending && !hasActiveColumnFilters(shell)) {
+            writeSkipState(null);
+        }
     }
 
     function fixTables(root) {
