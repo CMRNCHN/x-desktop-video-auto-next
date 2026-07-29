@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View (Tor)
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     1.0.0
+// @version     1.1.0
 // @description Tor-safe impersonal restyle: no external fonts/images, offline SVG placeholders, onion-friendly. Use Violentmonkey in Tor Browser.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -31,7 +31,7 @@
 
     const BASE_TEXT = '#5c5954';
     const BASE_MUTED = '#8a8580';
-    const BASE_NUM = '#7d8b86';
+    const BASE_NUM = '#b45309';
     const BASE_ACCENT = '#7a8580';
 
     const DEFAULTS = {
@@ -365,7 +365,12 @@
             'body .' + NUM_CLASS + ',',
             'body .' + NUM_CLASS + ' * {',
             '  color: var(--num) !important;',
+            '  font-weight: 700 !important;',
             '  font-variant-numeric: tabular-nums !important;',
+            '}',
+            'body .' + NUM_CLASS + '.impersonal-cc {',
+            '  letter-spacing: 0.02em !important;',
+            '  white-space: nowrap !important;',
             '}',
             'body header, body footer, body nav, body [role="banner"], body [role="navigation"],',
             'body [class*="header" i], body [id*="header" i],',
@@ -488,9 +493,42 @@
             '  box-shadow: none !important;',
             '}',
             'body ::placeholder { color: var(--text-muted) !important; opacity: 1 !important; }',
-            'body table { border-collapse: separate !important; border-spacing: 0 !important; width: 100% !important; }',
-            'body th, body td { border: 1px solid var(--border) !important; padding: 10px 14px !important; color: var(--text) !important; }',
-            'body th { background: var(--surface-muted) !important; font-weight: 600 !important; }',
+            'body .impersonal-table-wrap {',
+            '  display: block !important;',
+            '  width: 100% !important;',
+            '  max-width: 100% !important;',
+            '  overflow-x: auto !important;',
+            '  overflow-y: visible !important;',
+            '  -webkit-overflow-scrolling: touch !important;',
+            '  margin: 12px 0 !important;',
+            '  padding: 0 !important;',
+            '  border: 1px solid var(--border) !important;',
+            '  border-radius: var(--radius-sm) !important;',
+            '  background: var(--surface) !important;',
+            '  box-shadow: none !important;',
+            '}',
+            'body table {',
+            '  border-collapse: collapse !important;',
+            '  width: max-content !important;',
+            '  min-width: 100% !important;',
+            '  max-width: none !important;',
+            '  table-layout: auto !important;',
+            '  margin: 0 !important;',
+            '}',
+            'body th, body td {',
+            '  border: 1px solid var(--border) !important;',
+            '  padding: 8px 12px !important;',
+            '  color: var(--text) !important;',
+            '  vertical-align: top !important;',
+            '  white-space: normal !important;',
+            '  word-break: break-word !important;',
+            '  overflow-wrap: anywhere !important;',
+            '  hyphens: auto !important;',
+            '  min-width: 4.5rem !important;',
+            '  max-width: 28rem !important;',
+            '}',
+            'body th { background: var(--surface-muted) !important; font-weight: 700 !important; position: sticky !important; top: 0 !important; z-index: 1 !important; }',
+            'body caption { caption-side: top !important; text-align: left !important; padding: 8px 12px !important; color: var(--text-muted) !important; }',
             'body code, body pre, body kbd, body samp {',
             '  font-family: var(--font-mono) !important;',
             '  background: var(--surface-muted) !important;',
@@ -866,6 +904,17 @@
         });
     }
 
+    function formatCardNumber(digits) {
+        return String(digits).replace(/(\d{4})(?=\d)/g, '$1-');
+    }
+
+    function looksLikeCardNumber(raw) {
+        if (!raw || !/^[\d\s-]+$/.test(raw.trim())) return false;
+        if (/\.\d/.test(raw)) return false;
+        const digits = raw.replace(/\D/g, '');
+        return digits.length >= 13 && digits.length <= 19;
+    }
+
     function tintNumbers(root) {
         const scope = root && root.nodeType ? root : document.body;
         if (!scope || !document.createTreeWalker) return;
@@ -889,7 +938,8 @@
 
         nodes.forEach(function (textNode) {
             const text = textNode.nodeValue;
-            const re = /\d[\d,]*(?:\.\d+)?/g;
+            // Prefer long digit runs (cards with spaces/dashes), then normal numbers
+            const re = /(?:\d[\d\s-]{11,30}\d)|(?:\d[\d,]*(?:\.\d+)?)/g;
             let match;
             let last = 0;
             const frag = document.createDocumentFragment();
@@ -900,11 +950,17 @@
                 if (match.index > last) {
                     frag.appendChild(document.createTextNode(text.slice(last, match.index)));
                 }
+                const raw = match[0];
                 const span = document.createElement('span');
                 span.className = NUM_CLASS;
-                span.textContent = match[0];
+                if (looksLikeCardNumber(raw)) {
+                    span.className = NUM_CLASS + ' impersonal-cc';
+                    span.textContent = formatCardNumber(raw.replace(/\D/g, ''));
+                } else {
+                    span.textContent = raw;
+                }
                 frag.appendChild(span);
-                last = match.index + match[0].length;
+                last = match.index + raw.length;
             }
 
             if (!touched || !textNode.parentNode) return;
@@ -912,6 +968,26 @@
                 frag.appendChild(document.createTextNode(text.slice(last)));
             }
             textNode.parentNode.replaceChild(frag, textNode);
+        });
+    }
+
+    function fixTables(root) {
+        const scope = root && root.querySelectorAll ? root : document;
+        if (!scope.querySelectorAll) return;
+
+        scope.querySelectorAll('table').forEach(function (table) {
+            if (!table || !table.parentNode) return;
+            if (table.closest && table.closest('#' + PANEL_ID)) return;
+            if (table.parentElement && table.parentElement.classList.contains('impersonal-table-wrap')) {
+                return;
+            }
+            if (table.closest && table.closest('.impersonal-table-wrap')) return;
+
+            const wrap = document.createElement('div');
+            wrap.className = 'impersonal-table-wrap';
+            wrap.setAttribute(MARK, 'table');
+            table.parentNode.insertBefore(wrap, table);
+            wrap.appendChild(table);
         });
     }
 
@@ -937,6 +1013,7 @@
         ensureSettingsPanel();
         blankInlineBrandStyles(root || document);
         replaceMedia(root || document);
+        fixTables(root || document);
         tintNumbers((root && root.body) || root || document.body || document.documentElement);
         neutralizeDocumentTitle();
     }
