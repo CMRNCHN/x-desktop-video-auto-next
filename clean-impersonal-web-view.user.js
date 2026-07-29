@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     3.11.0
+// @version     3.12.0
 // @description Strips branding and restyles pages to a muted generic look; swaps media for a curated stock set so sites still read like ordinary websites.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -441,41 +441,49 @@
             '}',
             'body .impersonal-bin-filter,',
             'body .impersonal-table-filters {',
-            '  display: flex !important;',
-            '  flex-wrap: wrap !important;',
-            '  align-items: flex-end !important;',
-            '  justify-content: flex-start !important;',
-            '  gap: 8px 10px !important;',
+            '  display: grid !important;',
+            '  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;',
+            '  align-items: start !important;',
+            '  gap: 6px 8px !important;',
             '  width: 100% !important;',
             '  max-width: 100% !important;',
             '  margin: 0 0 8px !important;',
-            '  padding: 8px 10px !important;',
+            '  padding: 8px !important;',
             '  border: 1px solid #bdb7ae !important;',
             '  border-radius: 8px !important;',
             '  background: #ebe7e1 !important;',
             '  color: var(--text) !important;',
-            '  font-size: 13px !important;',
+            '  font-size: 12px !important;',
             '  font-weight: 700 !important;',
             '  box-sizing: border-box !important;',
+            '}',
+            '@media (max-width: 900px) {',
+            '  body .impersonal-table-filters {',
+            '    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;',
+            '  }',
+            '}',
+            '@media (max-width: 560px) {',
+            '  body .impersonal-table-filters {',
+            '    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;',
+            '  }',
             '}',
             'body .impersonal-table-filters .imp-filter-group {',
             '  display: flex !important;',
             '  flex-direction: column !important;',
-            '  gap: 3px !important;',
-            '  min-width: 120px !important;',
-            '  flex: 1 1 120px !important;',
-            '  max-width: 200px !important;',
+            '  gap: 2px !important;',
+            '  min-width: 0 !important;',
+            '  max-width: none !important;',
+            '  width: 100% !important;',
             '}',
             'body .impersonal-table-filters .imp-filter-group[data-filter-key="bin"] {',
-            '  max-width: 220px !important;',
-            '  flex: 1 1 180px !important;',
+            '  grid-row: span 1 !important;',
             '}',
             'body .impersonal-bin-filter label,',
             'body .impersonal-table-filters label {',
             '  font-weight: 800 !important;',
             '  color: var(--text) !important;',
             '  margin: 0 !important;',
-            '  font-size: 11px !important;',
+            '  font-size: 10px !important;',
             '  text-transform: uppercase !important;',
             '  letter-spacing: 0.03em !important;',
             '}',
@@ -485,49 +493,58 @@
             '  min-width: 0 !important;',
             '  width: 100% !important;',
             '  max-width: 100% !important;',
-            '  padding: 5px 8px !important;',
+            '  height: 28px !important;',
+            '  padding: 2px 6px !important;',
             '  border: 1px solid #a8a297 !important;',
-            '  border-radius: 5px !important;',
+            '  border-radius: 4px !important;',
             '  background: #f7f5f1 !important;',
             '  color: var(--text) !important;',
-            '  font-size: 13px !important;',
+            '  font-size: 12px !important;',
             '  font-weight: 700 !important;',
             '  box-sizing: border-box !important;',
+            '  line-height: 1.2 !important;',
             '}',
             'body .impersonal-table-filters select[multiple] {',
-            '  min-height: 96px !important;',
+            '  height: auto !important;',
+            '  min-height: 52px !important;',
+            '  max-height: 64px !important;',
             '  font-family: var(--font-mono) !important;',
+            '  font-size: 11px !important;',
             '}',
             'body .impersonal-table-filters .imp-bin-add-row {',
             '  display: flex !important;',
-            '  gap: 4px !important;',
+            '  gap: 3px !important;',
             '  width: 100% !important;',
             '}',
             'body .impersonal-table-filters .imp-bin-add-row input {',
             '  flex: 1 1 auto !important;',
+            '  height: 26px !important;',
             '}',
             'body .impersonal-table-filters .imp-bin-add-row button {',
             '  flex: 0 0 auto !important;',
             '  align-self: stretch !important;',
-            '  padding: 5px 8px !important;',
+            '  padding: 2px 6px !important;',
+            '  height: 26px !important;',
+            '  font-size: 11px !important;',
             '}',
             'body .impersonal-bin-filter button,',
             'body .impersonal-table-filters button {',
-            '  padding: 6px 10px !important;',
+            '  padding: 4px 8px !important;',
             '  border: 1px solid #a8a297 !important;',
-            '  border-radius: 5px !important;',
+            '  border-radius: 4px !important;',
             '  background: #d8d3cb !important;',
             '  color: var(--text) !important;',
-            '  font-size: 13px !important;',
+            '  font-size: 11px !important;',
             '  font-weight: 800 !important;',
             '  cursor: pointer !important;',
-            '  align-self: flex-end !important;',
+            '  align-self: end !important;',
             '  white-space: nowrap !important;',
+            '  height: 28px !important;',
             '}',
             'body .impersonal-bin-filter .imp-bin-count,',
             'body .impersonal-table-filters .imp-filter-count {',
             '  color: var(--text-muted) !important;',
-            '  font-size: 12px !important;',
+            '  font-size: 11px !important;',
             '  font-weight: 700 !important;',
             '  align-self: center !important;',
             '}',
@@ -572,7 +589,7 @@
             '}',
             'body th, body td {',
             '  border: 1px solid #a59e94 !important;',
-            '  padding: 6px 8px !important;',
+            '  padding: 8px 10px !important;',
             '  color: var(--text) !important;',
             '  vertical-align: middle !important;',
             '  white-space: normal !important;',
@@ -582,7 +599,7 @@
             '  width: auto !important;',
             '  min-width: 0 !important;',
             '  max-width: 18rem !important;',
-            '  font-size: clamp(15px, 0.55vw + 13px, 20px) !important;',
+            '  font-size: clamp(18px, 0.9vw + 15px, 24px) !important;',
             '  font-weight: 800 !important;',
             '  line-height: 1.25 !important;',
             '  overflow: visible !important;',
@@ -600,7 +617,7 @@
             '  white-space: nowrap !important;',
             '  overflow-wrap: normal !important;',
             '  word-break: normal !important;',
-            '  font-size: clamp(12px, 0.4vw + 11px, 15px) !important;',
+            '  font-size: clamp(14px, 0.55vw + 12px, 18px) !important;',
             '  font-weight: 800 !important;',
             '  line-height: 1.15 !important;',
             '  padding: 3px 6px !important;',
@@ -619,7 +636,7 @@
             '}',
             'body th {',
             '  background: #d2ccc3 !important;',
-            '  font-size: clamp(13px, 0.45vw + 11px, 16px) !important;',
+            '  font-size: clamp(15px, 0.6vw + 13px, 19px) !important;',
             '  font-weight: 800 !important;',
             '  letter-spacing: 0.02em !important;',
             '  text-transform: uppercase !important;',
@@ -630,9 +647,9 @@
             '  white-space: nowrap !important;',
             '  max-width: none !important;',
             '}',
-            'body tbody tr:nth-child(odd) td { background: #f7f5f1 !important; }',
-            'body tbody tr:nth-child(even) td { background: #ebe6de !important; }',
-            'body tbody tr:hover td { background: #ddd6cb !important; }',
+            'body tbody tr:nth-child(odd) td { background: #faf8f5 !important; }',
+            'body tbody tr:nth-child(even) td { background: #cfc6b8 !important; }',
+            'body tbody tr:hover td { background: #b9ae9e !important; }',
             'body td:nth-child(even) { box-shadow: none !important; }',
             'body caption { caption-side: top !important; text-align: left !important; padding: 4px 6px !important; color: var(--text-muted) !important; font-weight: 700 !important; font-size: 13px !important; }',
             'body tr[data-impersonal-bin-hidden="1"],',
@@ -983,6 +1000,37 @@
         return false;
     }
 
+    function looksLikeCaptcha(el) {
+        if (!el) return false;
+        const id = String(el.id || '');
+        const cls = String(el.className || '');
+        const name = String(el.getAttribute && el.getAttribute('name') || '');
+        const alt = String((el.getAttribute && (el.getAttribute('alt') || el.getAttribute('aria-label'))) || '');
+        const src = String(el.currentSrc || el.src || (el.getAttribute && el.getAttribute('src')) || '');
+        const blob = (id + ' ' + cls + ' ' + name + ' ' + alt + ' ' + src).toLowerCase();
+        if (/captcha|recaptcha|hcaptcha|turnstile|cf-challenge|g-recaptcha|h-captcha|challenge-platform|bot[-_ ]?check|verify[-_ ]?human|sec[-_ ]?check/.test(blob)) {
+            return true;
+        }
+        if (el.closest) {
+            try {
+                if (el.closest('[class*="captcha" i], [id*="captcha" i], .g-recaptcha, .h-captcha, [data-sitekey], [data-captcha], [name*="captcha" i]')) {
+                    return true;
+                }
+            } catch (err) {
+                if (el.closest('.g-recaptcha, .h-captcha, [data-sitekey], [data-captcha]')) return true;
+                let p = el.parentElement;
+                let hops = 0;
+                while (p && hops < 5) {
+                    const pb = ((p.id || '') + ' ' + (p.className || '')).toLowerCase();
+                    if (/captcha|recaptcha|hcaptcha|turnstile/.test(pb)) return true;
+                    p = p.parentElement;
+                    hops += 1;
+                }
+            }
+        }
+        return false;
+    }
+
     function looksLikeHero(el) {
         if (!el || !el.getBoundingClientRect) return false;
         const rect = el.getBoundingClientRect();
@@ -1025,6 +1073,14 @@
 
     function replaceImage(img) {
         if (!img || img.tagName !== 'IMG') return;
+        if (looksLikeCaptcha(img)) {
+            // Never replace captchas; undo prior marks so the real image can load
+            if (img.getAttribute(MARK) === 'done') {
+                img.removeAttribute(MARK);
+                img.removeAttribute('data-impersonal-src');
+            }
+            return;
+        }
         if (img.getAttribute(MARK) === 'done') {
             // SPA may have mutated src back — re-assert
             const desired = img.getAttribute('data-impersonal-src');
@@ -1057,10 +1113,11 @@
 
     function replacePicture(picture) {
         if (!picture || picture.tagName !== 'PICTURE') return;
+        const img = picture.querySelector('img');
+        if (looksLikeCaptcha(picture) || looksLikeCaptcha(img)) return;
         if (picture.getAttribute(MARK) === 'done') return;
         picture.setAttribute(MARK, 'done');
         picture.querySelectorAll('source').forEach((s) => s.remove());
-        const img = picture.querySelector('img');
         if (img) replaceImage(img);
     }
 
@@ -1107,6 +1164,7 @@
 
         nodes.forEach((el, index) => {
             if (el.getAttribute(MARK + '-bg') === 'done') return;
+            if (looksLikeCaptcha(el)) return;
             const bg = el.style.backgroundImage || el.style.background || '';
             if (!/url\(/i.test(bg)) return;
             if (isOurUrl(bg)) return;
@@ -1826,7 +1884,7 @@
                 if (def.key === 'bin') {
                     group.innerHTML = [
                         '<label>BIN</label>',
-                        '<select class="imp-bin-saved" multiple size="5" aria-label="Saved BINs"></select>',
+                        '<select class="imp-bin-saved" multiple size="3" aria-label="Saved BINs"></select>',
                         '<div class="imp-bin-add-row">',
                         '<input class="imp-bin-new" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-label="Add BIN">',
                         '<button type="button" class="imp-bin-add">Add BIN</button>',
