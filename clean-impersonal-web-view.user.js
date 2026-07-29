@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     3.5.0
+// @version     3.6.0
 // @description Strips branding and restyles pages to a muted generic look; swaps media for a curated stock set so sites still read like ordinary websites.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -536,7 +536,15 @@
             'body tbody tr:hover td { background: #ddd6cb !important; }',
             'body td:nth-child(even) { box-shadow: inset 1px 0 0 rgba(80,70,55,0.06) !important; }',
             'body caption { caption-side: top !important; text-align: center !important; padding: 10px 12px !important; color: var(--text-muted) !important; font-weight: 700 !important; }',
-            'body tr[data-impersonal-bin-hidden="1"] { display: none !important; }',
+            'body tr[data-impersonal-bin-hidden="1"],',
+            'body tr[data-impersonal-complete-hidden="1"] { display: none !important; }',
+            'body tr[data-impersonal-complete="1"]:not([data-impersonal-bin-hidden="1"]) td {',
+            '  background: #c8ecd0 !important;',
+            '  border-color: #7fb88a !important;',
+            '}',
+            'body tr[data-impersonal-complete="1"]:not([data-impersonal-bin-hidden="1"]):hover td {',
+            '  background: #b6e3c0 !important;',
+            '}',
             'body code, body pre, body kbd, body samp {',
             '  font-family: var(--font-mono) !important;',
             '  background: var(--surface-muted) !important;',
@@ -1033,6 +1041,13 @@
         CREDITCARD: true,
     };
 
+    const COMPLETE_CHECK_HEADERS = [
+        { key: 'FULLNAME', labels: { FULLNAME: true, 'FULL NAME': true } },
+        { key: 'ADDRESS', labels: { ADDRESS: true, ADDR: true } },
+        { key: 'DOB', labels: { DOB: true, 'DATE OF BIRTH': true, DATEOFBIRTH: true } },
+        { key: 'SSN', labels: { SSN: true } },
+    ];
+
     function normalizeHeaderLabel(text) {
         return String(text || '')
             .replace(/\u00a0/g, ' ')
@@ -1115,6 +1130,89 @@
         return false;
     }
 
+    function cellIsChecked(cell) {
+        if (!cell) return false;
+        const text = String(cell.innerText || cell.textContent || '').trim();
+        const lower = text.toLowerCase();
+        const html = String(cell.innerHTML || '');
+
+        if (
+            /[✗✘×❌✕⨉]|^\s*x+\s*$/i.test(text) ||
+            /^(no|false|fail|missing|none|n\/a|na)$/i.test(lower)
+        ) {
+            return false;
+        }
+        if (/fa-times|fa-xmark|icon-x|icon-cross|cross-mark|status-fail|status-no|text-danger/i.test(html)) {
+            return false;
+        }
+
+        if (
+            /[✓✔✅☑√]|^\s*[yY]\s*$/.test(text) ||
+            /^(yes|true|ok|pass|checked|complete|valid|1)$/i.test(lower)
+        ) {
+            return true;
+        }
+        if (
+            /fa-check|check-mark|icon-check|status-ok|status-yes|text-success|bi-check|glyphicon-ok/i.test(html) ||
+            /&#10003;|&#10004;|&check;|\\u2713|\\u2714/i.test(html)
+        ) {
+            return true;
+        }
+
+        const img = cell.querySelector && cell.querySelector('img, svg, i, span[class*="check" i], span[class*="tick" i]');
+        if (img) {
+            const blob = (
+                (img.getAttribute && (img.getAttribute('alt') || img.getAttribute('title') || img.getAttribute('class') || '')) +
+                ' ' +
+                (img.className || '')
+            ).toLowerCase();
+            if (/check|tick|ok|success|valid|yes/.test(blob)) return true;
+            if (/cross|times|fail|invalid|no|xmark/.test(blob)) return false;
+        }
+
+        return false;
+    }
+
+    function findCompleteCheckColumns(headerCells) {
+        const indexes = [];
+        for (let c = 0; c < COMPLETE_CHECK_HEADERS.length; c++) {
+            const idx = findColumnIndexByLabels(headerCells, COMPLETE_CHECK_HEADERS[c].labels);
+            if (idx < 0) return null;
+            indexes.push(idx);
+        }
+        return indexes;
+    }
+
+    function applyCompleteProfileFilter(table) {
+        const headerCells = getTableHeaderCells(table);
+        const cols = findCompleteCheckColumns(headerCells);
+        if (!cols) return;
+
+        Array.prototype.forEach.call(table.rows, function (row) {
+            if (isHeaderRow(row, table)) {
+                row.removeAttribute('data-impersonal-complete');
+                row.removeAttribute('data-impersonal-complete-hidden');
+                return;
+            }
+
+            let allChecked = true;
+            for (let i = 0; i < cols.length; i++) {
+                if (!cellIsChecked(row.cells[cols[i]])) {
+                    allChecked = false;
+                    break;
+                }
+            }
+
+            if (allChecked) {
+                row.setAttribute('data-impersonal-complete', '1');
+                row.removeAttribute('data-impersonal-complete-hidden');
+            } else {
+                row.setAttribute('data-impersonal-complete', '0');
+                row.setAttribute('data-impersonal-complete-hidden', '1');
+            }
+        });
+    }
+
     function hideUnwantedTableColumns(table) {
         const headerCells = getTableHeaderCells(table);
         if (!headerCells.length) return;
@@ -1173,7 +1271,9 @@
             if (show && needle && bin.indexOf(needle) !== 0) show = false;
             if (show) {
                 row.removeAttribute('data-impersonal-bin-hidden');
-                visible += 1;
+                if (row.getAttribute('data-impersonal-complete-hidden') !== '1') {
+                    visible += 1;
+                }
             } else {
                 row.setAttribute('data-impersonal-bin-hidden', '1');
             }
@@ -1261,6 +1361,7 @@
             if (table.closest && table.closest('.impersonal-bin-filter')) return;
 
             hideUnwantedTableColumns(table);
+            applyCompleteProfileFilter(table);
 
             let wrap = table.parentElement;
             let shell = null;
