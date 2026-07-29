@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     3.4.0
+// @version     3.5.0
 // @description Strips branding and restyles pages to a muted generic look; swaps media for a curated stock set so sites still read like ordinary websites.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -420,42 +420,123 @@
             '  box-shadow: none !important;',
             '}',
             'body ::placeholder { color: var(--text-muted) !important; opacity: 1 !important; }',
+            'body .impersonal-table-shell {',
+            '  display: flex !important;',
+            '  flex-direction: column !important;',
+            '  align-items: center !important;',
+            '  justify-content: flex-start !important;',
+            '  width: 100% !important;',
+            '  max-width: 100% !important;',
+            '  margin: 20px auto !important;',
+            '  padding: 0 12px !important;',
+            '  box-sizing: border-box !important;',
+            '}',
+            'body .impersonal-bin-filter {',
+            '  display: flex !important;',
+            '  flex-wrap: wrap !important;',
+            '  align-items: center !important;',
+            '  justify-content: center !important;',
+            '  gap: 8px 10px !important;',
+            '  width: fit-content !important;',
+            '  max-width: 100% !important;',
+            '  margin: 0 0 12px !important;',
+            '  padding: 10px 12px !important;',
+            '  border: 1px solid #bdb7ae !important;',
+            '  border-radius: 10px !important;',
+            '  background: #ebe7e1 !important;',
+            '  color: var(--text) !important;',
+            '  font-size: 14px !important;',
+            '  font-weight: 650 !important;',
+            '}',
+            'body .impersonal-bin-filter label {',
+            '  font-weight: 700 !important;',
+            '  color: var(--text) !important;',
+            '  margin: 0 !important;',
+            '}',
+            'body .impersonal-bin-filter input[type="search"],',
+            'body .impersonal-bin-filter select {',
+            '  min-width: 140px !important;',
+            '  max-width: 220px !important;',
+            '  padding: 7px 10px !important;',
+            '  border: 1px solid #a8a297 !important;',
+            '  border-radius: 6px !important;',
+            '  background: #f7f5f1 !important;',
+            '  color: var(--text) !important;',
+            '  font-size: 14px !important;',
+            '  font-weight: 650 !important;',
+            '}',
+            'body .impersonal-bin-filter button {',
+            '  padding: 7px 12px !important;',
+            '  border: 1px solid #a8a297 !important;',
+            '  border-radius: 6px !important;',
+            '  background: #d8d3cb !important;',
+            '  color: var(--text) !important;',
+            '  font-size: 13px !important;',
+            '  font-weight: 700 !important;',
+            '  cursor: pointer !important;',
+            '}',
+            'body .impersonal-bin-filter .imp-bin-count {',
+            '  color: var(--text-muted) !important;',
+            '  font-size: 13px !important;',
+            '  font-weight: 600 !important;',
+            '}',
             'body .impersonal-table-wrap {',
             '  display: block !important;',
-            '  width: 100% !important;',
+            '  width: fit-content !important;',
             '  max-width: 100% !important;',
             '  overflow-x: auto !important;',
             '  overflow-y: visible !important;',
             '  -webkit-overflow-scrolling: touch !important;',
-            '  margin: 12px 0 !important;',
+            '  margin: 0 auto !important;',
             '  padding: 0 !important;',
-            '  border: 1px solid var(--border) !important;',
-            '  border-radius: var(--radius-sm) !important;',
-            '  background: var(--surface) !important;',
-            '  box-shadow: none !important;',
+            '  border: 2px solid #9f978c !important;',
+            '  border-radius: 10px !important;',
+            '  background: #f7f5f1 !important;',
+            '  box-shadow: 0 1px 0 #fff inset !important;',
             '}',
+            'body .impersonal-table-shell table,',
+            'body .impersonal-table-wrap table,',
             'body table {',
-            '  border-collapse: collapse !important;',
+            '  border-collapse: separate !important;',
+            '  border-spacing: 0 !important;',
             '  width: max-content !important;',
-            '  min-width: 100% !important;',
+            '  min-width: 0 !important;',
             '  max-width: none !important;',
             '  table-layout: auto !important;',
-            '  margin: 0 !important;',
+            '  margin: 0 auto !important;',
             '}',
             'body th, body td {',
-            '  border: 1px solid var(--border) !important;',
-            '  padding: 8px 12px !important;',
+            '  border: 1px solid #a59e94 !important;',
+            '  padding: 12px 16px !important;',
             '  color: var(--text) !important;',
-            '  vertical-align: top !important;',
+            '  vertical-align: middle !important;',
             '  white-space: normal !important;',
             '  word-break: break-word !important;',
             '  overflow-wrap: anywhere !important;',
             '  hyphens: auto !important;',
-            '  min-width: 4.5rem !important;',
-            '  max-width: 28rem !important;',
+            '  min-width: 5rem !important;',
+            '  max-width: 22rem !important;',
+            '  font-size: 16px !important;',
+            '  font-weight: 700 !important;',
+            '  line-height: 1.35 !important;',
             '}',
-            'body th { background: var(--surface-muted) !important; font-weight: 700 !important; position: sticky !important; top: 0 !important; z-index: 1 !important; }',
-            'body caption { caption-side: top !important; text-align: left !important; padding: 8px 12px !important; color: var(--text-muted) !important; }',
+            'body th {',
+            '  background: #d2ccc3 !important;',
+            '  font-size: 15px !important;',
+            '  font-weight: 800 !important;',
+            '  letter-spacing: 0.02em !important;',
+            '  text-transform: uppercase !important;',
+            '  position: sticky !important;',
+            '  top: 0 !important;',
+            '  z-index: 2 !important;',
+            '  border-bottom: 2px solid #8f877c !important;',
+            '}',
+            'body tbody tr:nth-child(odd) td { background: #f7f5f1 !important; }',
+            'body tbody tr:nth-child(even) td { background: #e7e2da !important; }',
+            'body tbody tr:hover td { background: #ddd6cb !important; }',
+            'body td:nth-child(even) { box-shadow: inset 1px 0 0 rgba(80,70,55,0.06) !important; }',
+            'body caption { caption-side: top !important; text-align: center !important; padding: 10px 12px !important; color: var(--text-muted) !important; font-weight: 700 !important; }',
+            'body tr[data-impersonal-bin-hidden="1"] { display: none !important; }',
             'body code, body pre, body kbd, body samp {',
             '  font-family: var(--font-mono) !important;',
             '  background: var(--surface-muted) !important;',
@@ -931,6 +1012,27 @@
         ITEM: true,
     };
 
+    const BIN_HEADER_LABELS = {
+        BIN: true,
+        BINS: true,
+        'CARD BIN': true,
+        CARDBIN: true,
+        IIN: true,
+    };
+
+    const CARD_HEADER_LABELS = {
+        CARD: true,
+        CC: true,
+        PAN: true,
+        NUMBER: true,
+        'CARD NUMBER': true,
+        CARDNUMBER: true,
+        'CC NUMBER': true,
+        CCNUMBER: true,
+        'CREDIT CARD': true,
+        CREDITCARD: true,
+    };
+
     function normalizeHeaderLabel(text) {
         return String(text || '')
             .replace(/\u00a0/g, ' ')
@@ -944,38 +1046,77 @@
         const label = normalizeHeaderLabel(text);
         if (!label) return false;
         if (HIDDEN_TABLE_HEADERS[label]) return true;
-        // compact form without spaces
         const compact = label.replace(/\s+/g, '');
         return !!HIDDEN_TABLE_HEADERS[compact];
     }
 
-    function hideUnwantedTableColumns(table) {
-        if (!table || table.getAttribute(MARK + '-cols') === 'done') {
-            // Still re-apply in case SPA re-rendered cells without the attribute on new rows
-        }
-
+    function getTableHeaderCells(table) {
         const headerCells = [];
         const theadRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
         if (theadRow) {
             Array.prototype.forEach.call(theadRow.cells, function (cell) {
                 headerCells.push(cell);
             });
-        } else {
-            const firstRow = table.querySelector('tr');
-            if (firstRow) {
-                Array.prototype.forEach.call(firstRow.cells, function (cell) {
-                    if (cell.tagName === 'TH' || firstRow.parentElement === table.tHead) {
-                        headerCells.push(cell);
-                    }
-                });
-                if (!headerCells.length) {
-                    Array.prototype.forEach.call(firstRow.cells, function (cell) {
-                        headerCells.push(cell);
-                    });
-                }
+            return headerCells;
+        }
+        const firstRow = table.querySelector('tr');
+        if (!firstRow) return headerCells;
+        Array.prototype.forEach.call(firstRow.cells, function (cell) {
+            if (cell.tagName === 'TH') headerCells.push(cell);
+        });
+        if (!headerCells.length) {
+            Array.prototype.forEach.call(firstRow.cells, function (cell) {
+                headerCells.push(cell);
+            });
+        }
+        return headerCells;
+    }
+
+    function findColumnIndexByLabels(headerCells, labelMap) {
+        for (let i = 0; i < headerCells.length; i++) {
+            const label = normalizeHeaderLabel(headerCells[i].innerText || headerCells[i].textContent || '');
+            const compact = label.replace(/\s+/g, '');
+            if (labelMap[label] || labelMap[compact]) return i;
+        }
+        return -1;
+    }
+
+    function extractBinFromText(text) {
+        const digits = String(text || '').replace(/\D/g, '');
+        if (digits.length >= 6) return digits.slice(0, 6);
+        return '';
+    }
+
+    function getRowBin(row, binIdx, cardIdx) {
+        if (binIdx >= 0 && row.cells[binIdx]) {
+            const fromBin = extractBinFromText(row.cells[binIdx].innerText || row.cells[binIdx].textContent || '');
+            if (fromBin) return fromBin;
+        }
+        if (cardIdx >= 0 && row.cells[cardIdx]) {
+            const fromCard = extractBinFromText(row.cells[cardIdx].innerText || row.cells[cardIdx].textContent || '');
+            if (fromCard) return fromCard;
+        }
+        for (let i = 0; i < row.cells.length; i++) {
+            const cell = row.cells[i];
+            if (cell.getAttribute('data-impersonal-col-hidden') === '1') continue;
+            const raw = cell.innerText || cell.textContent || '';
+            const digits = raw.replace(/\D/g, '');
+            if (digits.length >= 13 && digits.length <= 19) {
+                return digits.slice(0, 6);
             }
         }
+        return '';
+    }
 
+    function isHeaderRow(row, table) {
+        if (!row) return true;
+        if (table.tHead && row.parentElement === table.tHead) return true;
+        if (row.querySelector('th') && row === table.querySelector('tr')) return true;
+        return false;
+    }
+
+    function hideUnwantedTableColumns(table) {
+        const headerCells = getTableHeaderCells(table);
         if (!headerCells.length) return;
 
         const hideIdx = [];
@@ -1006,6 +1147,110 @@
         table.setAttribute(MARK + '-cols', 'done');
     }
 
+    function collectTableBins(table, binIdx, cardIdx) {
+        const bins = {};
+        Array.prototype.forEach.call(table.rows, function (row) {
+            if (isHeaderRow(row, table)) return;
+            const bin = getRowBin(row, binIdx, cardIdx);
+            if (bin) bins[bin] = true;
+            row.setAttribute('data-impersonal-bin', bin || '');
+        });
+        return Object.keys(bins).sort();
+    }
+
+    function applyBinFilterToTable(table, selectedBin, prefix) {
+        const needle = String(prefix || '').replace(/\D/g, '');
+        const exact = String(selectedBin || '').replace(/\D/g, '');
+        let visible = 0;
+        let total = 0;
+
+        Array.prototype.forEach.call(table.rows, function (row) {
+            if (isHeaderRow(row, table)) return;
+            total += 1;
+            const bin = row.getAttribute('data-impersonal-bin') || '';
+            let show = true;
+            if (exact && exact !== 'ALL' && bin !== exact) show = false;
+            if (show && needle && bin.indexOf(needle) !== 0) show = false;
+            if (show) {
+                row.removeAttribute('data-impersonal-bin-hidden');
+                visible += 1;
+            } else {
+                row.setAttribute('data-impersonal-bin-hidden', '1');
+            }
+        });
+
+        return { visible: visible, total: total };
+    }
+
+    function ensureBinFilter(shell, table) {
+        const headerCells = getTableHeaderCells(table);
+        const binIdx = findColumnIndexByLabels(headerCells, BIN_HEADER_LABELS);
+        const cardIdx = findColumnIndexByLabels(headerCells, CARD_HEADER_LABELS);
+        const bins = collectTableBins(table, binIdx, cardIdx);
+
+        let filter = shell.querySelector('.impersonal-bin-filter');
+        if (!filter) {
+            filter = document.createElement('div');
+            filter.className = 'impersonal-bin-filter';
+            filter.setAttribute(MARK, 'bin-filter');
+            filter.innerHTML = [
+                '<label>BIN</label>',
+                '<select class="imp-bin-select" aria-label="Filter by BIN">',
+                '<option value="ALL">All BINs</option>',
+                '</select>',
+                '<input class="imp-bin-search" type="search" inputmode="numeric" placeholder="Type BIN prefix" aria-label="BIN prefix filter" />',
+                '<button type="button" class="imp-bin-clear">Clear</button>',
+                '<span class="imp-bin-count"></span>',
+            ].join('');
+            shell.insertBefore(filter, shell.firstChild);
+
+            const select = filter.querySelector('.imp-bin-select');
+            const search = filter.querySelector('.imp-bin-search');
+            const clearBtn = filter.querySelector('.imp-bin-clear');
+            const countEl = filter.querySelector('.imp-bin-count');
+
+            function runFilter() {
+                const stats = applyBinFilterToTable(table, select.value, search.value);
+                countEl.textContent = stats.visible + ' / ' + stats.total + ' rows';
+            }
+
+            select.addEventListener('change', runFilter);
+            search.addEventListener('input', runFilter);
+            clearBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                select.value = 'ALL';
+                search.value = '';
+                runFilter();
+            });
+
+            filter._impRunFilter = runFilter;
+        }
+
+        const select = filter.querySelector('.imp-bin-select');
+        const current = select.value || 'ALL';
+        const existing = {};
+        Array.prototype.forEach.call(select.options, function (opt) {
+            existing[opt.value] = true;
+        });
+
+        bins.forEach(function (bin) {
+            if (existing[bin]) return;
+            const opt = document.createElement('option');
+            opt.value = bin;
+            opt.textContent = bin;
+            select.appendChild(opt);
+        });
+
+        if (current && (current === 'ALL' || existing[current] || bins.indexOf(current) !== -1)) {
+            select.value = current;
+        } else {
+            select.value = 'ALL';
+        }
+
+        if (filter._impRunFilter) filter._impRunFilter();
+        filter.style.display = bins.length ? 'flex' : 'none';
+    }
+
     function fixTables(root) {
         const scope = root && root.querySelectorAll ? root : document;
         if (!scope.querySelectorAll) return;
@@ -1013,18 +1258,45 @@
         scope.querySelectorAll('table').forEach(function (table) {
             if (!table || !table.parentNode) return;
             if (table.closest && table.closest('#' + PANEL_ID)) return;
+            if (table.closest && table.closest('.impersonal-bin-filter')) return;
 
-            const alreadyWrapped =
-                table.parentElement && table.parentElement.classList.contains('impersonal-table-wrap');
-            if (!alreadyWrapped) {
-                const wrap = document.createElement('div');
+            hideUnwantedTableColumns(table);
+
+            let wrap = table.parentElement;
+            let shell = null;
+
+            if (wrap && wrap.classList.contains('impersonal-table-wrap')) {
+                shell = wrap.parentElement && wrap.parentElement.classList.contains('impersonal-table-shell')
+                    ? wrap.parentElement
+                    : null;
+            } else if (wrap && wrap.classList.contains('impersonal-table-shell')) {
+                shell = wrap;
+                wrap = null;
+            } else {
+                wrap = null;
+                shell = null;
+            }
+
+            if (!shell) {
+                shell = document.createElement('div');
+                shell.className = 'impersonal-table-shell';
+                shell.setAttribute(MARK, 'table-shell');
+                table.parentNode.insertBefore(shell, table);
+            }
+
+            if (!wrap) {
+                wrap = document.createElement('div');
                 wrap.className = 'impersonal-table-wrap';
                 wrap.setAttribute(MARK, 'table');
-                table.parentNode.insertBefore(wrap, table);
+                shell.appendChild(wrap);
+                wrap.appendChild(table);
+            } else if (wrap.parentElement !== shell) {
+                shell.appendChild(wrap);
+            } else if (table.parentElement !== wrap) {
                 wrap.appendChild(table);
             }
 
-            hideUnwantedTableColumns(table);
+            ensureBinFilter(shell, table);
         });
     }
 
