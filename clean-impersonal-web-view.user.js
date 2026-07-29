@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     3.6.1
+// @version     3.7.0
 // @description Strips branding and restyles pages to a muted generic look; swaps media for a curated stock set so sites still read like ordinary websites.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -454,9 +454,10 @@
             '  margin: 0 !important;',
             '}',
             'body .impersonal-bin-filter input[type="search"],',
+            'body .impersonal-bin-filter textarea.imp-bin-search,',
             'body .impersonal-bin-filter select {',
-            '  min-width: 140px !important;',
-            '  max-width: 220px !important;',
+            '  min-width: 160px !important;',
+            '  max-width: 320px !important;',
             '  padding: 7px 10px !important;',
             '  border: 1px solid #a8a297 !important;',
             '  border-radius: 6px !important;',
@@ -464,6 +465,18 @@
             '  color: var(--text) !important;',
             '  font-size: 14px !important;',
             '  font-weight: 650 !important;',
+            '}',
+            'body .impersonal-bin-filter select[multiple] {',
+            '  min-width: 140px !important;',
+            '  min-height: 88px !important;',
+            '}',
+            'body .impersonal-bin-filter textarea.imp-bin-search {',
+            '  min-width: 220px !important;',
+            '  width: 260px !important;',
+            '  min-height: 64px !important;',
+            '  resize: vertical !important;',
+            '  font-family: var(--font-mono) !important;',
+            '  line-height: 1.35 !important;',
             '}',
             'body .impersonal-bin-filter button {',
             '  padding: 7px 12px !important;',
@@ -1346,9 +1359,46 @@
         return Object.keys(bins).sort();
     }
 
-    function applyBinFilterToTable(table, selectedBin, prefix) {
-        const needle = String(prefix || '').replace(/\D/g, '');
-        const exact = String(selectedBin || '').replace(/\D/g, '');
+    function parseBinQueries(raw) {
+        return String(raw || '')
+            .split(/[\s,;|/]+/)
+            .map(function (part) {
+                return part.replace(/\D/g, '');
+            })
+            .filter(function (part) {
+                return part.length > 0;
+            });
+    }
+
+    function getSelectedBinValues(select) {
+        if (!select) return [];
+        const values = [];
+        Array.prototype.forEach.call(select.selectedOptions || [], function (opt) {
+            const v = String(opt.value || '').replace(/\D/g, '');
+            if (v) values.push(v);
+        });
+        // single-select fallback
+        if (!values.length && select.value && select.value !== 'ALL') {
+            const one = String(select.value).replace(/\D/g, '');
+            if (one) values.push(one);
+        }
+        return values;
+    }
+
+    function binMatchesQueries(bin, queries) {
+        if (!queries.length) return true;
+        if (!bin) return false;
+        for (let i = 0; i < queries.length; i++) {
+            const q = queries[i];
+            if (bin === q || bin.indexOf(q) === 0) return true;
+        }
+        return false;
+    }
+
+    function applyBinFilterToTable(table, selectedBins, queryRaw) {
+        const selected = Array.isArray(selectedBins) ? selectedBins.slice() : getSelectedBinValues({ value: selectedBins, selectedOptions: [] });
+        const typed = parseBinQueries(queryRaw);
+        const queries = selected.concat(typed);
         let visible = 0;
         let total = 0;
 
@@ -1356,9 +1406,7 @@
             if (isHeaderRow(row, table)) return;
             total += 1;
             const bin = row.getAttribute('data-impersonal-bin') || '';
-            let show = true;
-            if (exact && exact !== 'ALL' && bin !== exact) show = false;
-            if (show && needle && bin.indexOf(needle) !== 0) show = false;
+            const show = binMatchesQueries(bin, queries);
             if (show) {
                 row.removeAttribute('data-impersonal-bin-hidden');
                 if (row.getAttribute('data-impersonal-complete-hidden') !== '1') {
@@ -1369,7 +1417,7 @@
             }
         });
 
-        return { visible: visible, total: total };
+        return { visible: visible, total: total, queryCount: queries.length };
     }
 
     function ensureBinFilter(shell, table) {
@@ -1379,16 +1427,18 @@
         const bins = collectTableBins(table, binIdx, cardIdx);
 
         let filter = shell.querySelector('.impersonal-bin-filter');
+        if (filter && !filter.querySelector('textarea.imp-bin-search')) {
+            filter.parentNode.removeChild(filter);
+            filter = null;
+        }
         if (!filter) {
             filter = document.createElement('div');
             filter.className = 'impersonal-bin-filter';
             filter.setAttribute(MARK, 'bin-filter');
             filter.innerHTML = [
                 '<label>BIN</label>',
-                '<select class="imp-bin-select" aria-label="Filter by BIN">',
-                '<option value="ALL">All BINs</option>',
-                '</select>',
-                '<input class="imp-bin-search" type="search" inputmode="numeric" placeholder="Type BIN prefix" aria-label="BIN prefix filter" />',
+                '<select class="imp-bin-select" multiple size="4" aria-label="Filter by one or more BINs"></select>',
+                '<textarea class="imp-bin-search" rows="3" spellcheck="false" placeholder="Multiple BINs OK&#10;411111, 424242&#10;400000" aria-label="BIN list filter"></textarea>',
                 '<button type="button" class="imp-bin-clear">Clear</button>',
                 '<span class="imp-bin-count"></span>',
             ].join('');
@@ -1400,15 +1450,18 @@
             const countEl = filter.querySelector('.imp-bin-count');
 
             function runFilter() {
-                const stats = applyBinFilterToTable(table, select.value, search.value);
-                countEl.textContent = stats.visible + ' / ' + stats.total + ' rows';
+                const stats = applyBinFilterToTable(table, getSelectedBinValues(select), search.value);
+                const extra = stats.queryCount ? ' · ' + stats.queryCount + ' BIN filter' + (stats.queryCount === 1 ? '' : 's') : '';
+                countEl.textContent = stats.visible + ' / ' + stats.total + ' rows' + extra;
             }
 
             select.addEventListener('change', runFilter);
             search.addEventListener('input', runFilter);
             clearBtn.addEventListener('click', function (e) {
                 e.preventDefault();
-                select.value = 'ALL';
+                Array.prototype.forEach.call(select.options, function (opt) {
+                    opt.selected = false;
+                });
                 search.value = '';
                 runFilter();
             });
@@ -1417,7 +1470,11 @@
         }
 
         const select = filter.querySelector('.imp-bin-select');
-        const current = select.value || 'ALL';
+        const previouslySelected = {};
+        Array.prototype.forEach.call(select.selectedOptions || [], function (opt) {
+            previouslySelected[opt.value] = true;
+        });
+
         const existing = {};
         Array.prototype.forEach.call(select.options, function (opt) {
             existing[opt.value] = true;
@@ -1428,14 +1485,9 @@
             const opt = document.createElement('option');
             opt.value = bin;
             opt.textContent = bin;
+            if (previouslySelected[bin]) opt.selected = true;
             select.appendChild(opt);
         });
-
-        if (current && (current === 'ALL' || existing[current] || bins.indexOf(current) !== -1)) {
-            select.value = current;
-        } else {
-            select.value = 'ALL';
-        }
 
         if (filter._impRunFilter) filter._impRunFilter();
         filter.style.display = bins.length ? 'flex' : 'none';
