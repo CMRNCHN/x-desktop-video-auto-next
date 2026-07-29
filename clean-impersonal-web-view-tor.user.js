@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View (Tor)
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     1.5.0
+// @version     1.5.1
 // @description Tor-safe impersonal restyle: no external fonts/images, offline SVG placeholders, onion-friendly. Use Violentmonkey in Tor Browser.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -497,12 +497,16 @@
             '  display: flex !important;',
             '  flex-direction: column !important;',
             '  align-items: center !important;',
-            '  justify-content: flex-start !important;',
-            '  width: 100% !important;',
-            '  max-width: 100% !important;',
-            '  margin: 20px auto !important;',
-            '  padding: 0 12px !important;',
+            '  justify-content: center !important;',
+            '  width: max-content !important;',
+            '  max-width: 98vw !important;',
+            '  min-height: calc(100vh - 48px) !important;',
+            '  margin: 0 auto !important;',
+            '  padding: 24px 12px !important;',
             '  box-sizing: border-box !important;',
+            '  position: relative !important;',
+            '  left: 50% !important;',
+            '  transform: translateX(-50%) !important;',
             '}',
             'body .impersonal-bin-filter {',
             '  display: flex !important;',
@@ -511,8 +515,8 @@
             '  justify-content: center !important;',
             '  gap: 8px 10px !important;',
             '  width: fit-content !important;',
-            '  max-width: 100% !important;',
-            '  margin: 0 0 12px !important;',
+            '  max-width: 98vw !important;',
+            '  margin: 0 auto 16px !important;',
             '  padding: 10px 12px !important;',
             '  border: 1px solid #bdb7ae !important;',
             '  border-radius: 10px !important;',
@@ -568,8 +572,8 @@
             '}',
             'body .impersonal-table-wrap {',
             '  display: block !important;',
-            '  width: fit-content !important;',
-            '  max-width: 100% !important;',
+            '  width: max-content !important;',
+            '  max-width: 98vw !important;',
             '  overflow-x: auto !important;',
             '  overflow-y: visible !important;',
             '  -webkit-overflow-scrolling: touch !important;',
@@ -593,19 +597,20 @@
             '}',
             'body th, body td {',
             '  border: 1px solid #a59e94 !important;',
-            '  padding: 12px 16px !important;',
+            '  padding: 14px 18px !important;',
             '  color: var(--text) !important;',
             '  vertical-align: middle !important;',
-            '  white-space: normal !important;',
-            '  word-break: break-word !important;',
-            '  overflow-wrap: anywhere !important;',
-            '  hyphens: auto !important;',
-            '  min-width: 5rem !important;',
-            '  max-width: 22rem !important;',
-            '  font-size: 16px !important;',
+            '  white-space: nowrap !important;',
+            '  word-break: normal !important;',
+            '  overflow-wrap: normal !important;',
+            '  hyphens: none !important;',
+            '  width: auto !important;',
+            '  min-width: 0 !important;',
+            '  max-width: none !important;',
+            '  font-size: 19px !important;',
             '  font-weight: 700 !important;',
-            '  line-height: 1.35 !important;',
-            '  overflow: hidden !important;',
+            '  line-height: 1.3 !important;',
+            '  overflow: visible !important;',
             '}',
             'body td .badge,',
             'body td [class*="badge" i],',
@@ -614,31 +619,32 @@
             'body td span.fs-11px,',
             'body td span.text-info {',
             '  display: inline-block !important;',
-            '  max-width: 100% !important;',
-            '  width: fit-content !important;',
+            '  max-width: none !important;',
+            '  width: auto !important;',
             '  box-sizing: border-box !important;',
-            '  white-space: normal !important;',
-            '  overflow-wrap: anywhere !important;',
-            '  word-break: break-word !important;',
-            '  font-size: 10px !important;',
+            '  white-space: nowrap !important;',
+            '  overflow-wrap: normal !important;',
+            '  word-break: normal !important;',
+            '  font-size: 13px !important;',
             '  font-weight: 700 !important;',
-            '  line-height: 1.15 !important;',
-            '  padding: 2px 5px !important;',
+            '  line-height: 1.2 !important;',
+            '  padding: 4px 8px !important;',
             '  margin: 0 !important;',
             '  vertical-align: middle !important;',
             '  border-width: 1px !important;',
             '}',
             'body td[data-impersonal-type-col="1"],',
             'body th[data-impersonal-type-col="1"] {',
-            '  min-width: 4.5rem !important;',
-            '  max-width: 7.5rem !important;',
-            '  width: 7.5rem !important;',
+            '  min-width: 0 !important;',
+            '  max-width: none !important;',
+            '  width: auto !important;',
             '  text-align: center !important;',
-            '  padding: 8px 6px !important;',
+            '  padding: 14px 12px !important;',
+            '  white-space: nowrap !important;',
             '}',
             'body th {',
             '  background: #d2ccc3 !important;',
-            '  font-size: 15px !important;',
+            '  font-size: 17px !important;',
             '  font-weight: 800 !important;',
             '  letter-spacing: 0.02em !important;',
             '  text-transform: uppercase !important;',
@@ -1361,12 +1367,13 @@
                 ? cell.querySelectorAll('.badge, [class*="badge" i], span.fs-11px, span.text-info, span.bg-info')
                 : [];
             Array.prototype.forEach.call(badges, function (badge) {
-                badge.style.setProperty('max-width', '100%', 'important');
-                badge.style.setProperty('white-space', 'normal', 'important');
-                badge.style.setProperty('font-size', '10px', 'important');
-                badge.style.setProperty('padding', '2px 5px', 'important');
+                badge.style.setProperty('max-width', 'none', 'important');
+                badge.style.setProperty('white-space', 'nowrap', 'important');
+                badge.style.setProperty('font-size', '13px', 'important');
+                badge.style.setProperty('padding', '4px 8px', 'important');
                 badge.style.setProperty('display', 'inline-block', 'important');
                 badge.style.setProperty('box-sizing', 'border-box', 'important');
+                badge.style.setProperty('width', 'auto', 'important');
             });
         });
     }
