@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>X-AutoNext Harness</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #111; color: #eee; }
+    #log { white-space: pre-wrap; background: #1a1a1a; padding: 12px; border-radius: 8px; max-height: 280px; overflow: auto; font-size: 12px; }
+    article { margin: 16px 0; padding: 12px; border: 1px solid #333; border-radius: 8px; }
+    video { width: 320px; height: 180px; background: #000; display: block; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    button { padding: 8px 12px; cursor: pointer; }
+    #status { margin: 8px 0 16px; color: #8f8; }
+  </style>
+</head>
+<body>
+  <h1>X Desktop Video Auto Next — local harness</h1>
+  <p id="status">Loading…</p>
+  <div class="row">
+    <button id="btn-play1">Play video 1</button>
+    <button id="btn-near-end">Seek near end</button>
+    <button id="btn-next">Manual next (postMessage)</button>
+    <button id="btn-probe">Probe</button>
+  </div>
+  <div id="feed">
+    <article data-testid="cellInnerDiv">
+      <a href="/user/status/111/video/1">status 111</a>
+      <video id="v1" controls muted playsinline></video>
+    </article>
+    <article data-testid="cellInnerDiv">
+      <a href="/user/status/222/video/1">status 222</a>
+      <video id="v2" controls muted playsinline></video>
+    </article>
+    <article data-testid="cellInnerDiv">
+      <a href="/user/status/333/video/1">status 333</a>
+      <video id="v3" controls muted playsinline></video>
+    </article>
+  </div>
+  <h2>Log</h2>
+  <div id="log"></div>
+
+  <script>
+    // Fake SPA path so script treats us like a timeline / status page.
+    history.replaceState({}, '', '/home');
+
+    const logEl = document.getElementById('log');
+    const statusEl = document.getElementById('status');
+    const origLog = console.log;
+    console.log = function () {
+      const args = Array.from(arguments).map(a => {
+        try { return typeof a === 'object' ? JSON.stringify(a) : String(a); } catch { return String(a); }
+      });
+      logEl.textContent += args.join(' ') + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+      origLog.apply(console, arguments);
+    };
+
+    // Tiny colored MP4s via MediaSource-less approach: canvas-recorded blobs aren't always available.
+    // Use short silent WebM/MP4 data URIs if possible; fallback to MediaStream.
+    async function makeClip(seconds, color) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 320; canvas.height = 180;
+      const ctx = canvas.getContext('2d');
+      if (canvas.captureStream && window.MediaRecorder) {
+        const stream = canvas.captureStream(30);
+        const rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
+        const chunks = [];
+        rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+        const done = new Promise(r => { rec.onstop = () => r(URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }))); });
+        rec.start();
+        const start = performance.now();
+        function frame() {
+          const t = (performance.now() - start) / 1000;
+          ctx.fillStyle = color;
+          ctx.fillRect(0, 0, 320, 180);
+          ctx.fillStyle = '#fff';
+          ctx.font = '24px sans-serif';
+          ctx.fillText(t.toFixed(1) + 's', 20, 40);
+          if (t < seconds) requestAnimationFrame(frame);
+          else rec.stop();
+        }
+        frame();
+        return done;
+      }
+      // Fallback: empty blob — duration may be NaN; tests will still attach.
+      return '';
+    }
+
+    window.__harness = { advances: 0, lastFrom: null, lastTo: null };
+
+    // Intercept history/location assign used by openInVideoViewer
+    const origAssign = location.assign.bind(location);
+    location.assign = function (url) {
+      console.log('[harness] location.assign', url);
+      window.__harness.advances++;
+      window.__harness.lastTo = String(url);
+      statusEl.textContent = 'Advance via location.assign → ' + url;
+    };
+    const origPush = history.pushState.bind(history);
+    history.pushState = function (s, t, url) {
+      console.log('[harness] pushState', url);
+      if (url && String(url).indexOf('/video/') !== -1) {
+        window.__harness.advances++;
+        window.__harness.lastTo = String(url);
+        statusEl.textContent = 'Advance via pushState → ' + url;
+      }
+      return origPush(s, t, url);
+    };
+
+    (async function setup() {
+      const urls = await Promise.all([
+        makeClip(2.2, '#2244aa'),
+        makeClip(2.2, '#aa2244'),
+        makeClip(2.2, '#22aa44')
+      ]);
+      ['v1','v2','v3'].forEach((id, i) => {
+        const v = document.getElementById(id);
+        if (urls[i]) v.src = urls[i];
+        v.loop = true; // script should disable this
+      });
+      statusEl.textContent = 'Clips ready. Load script next.';
+      window.__harness.ready = true;
+    })();
+
+    document.getElementById('btn-play1').onclick = () => {
+      const v = document.getElementById('v1');
+      v.muted = true;
+      v.play();
+    };
+    document.getElementById('btn-near-end').onclick = () => {
+      const v = document.getElementById('v1');
+      if (isFinite(v.duration)) v.currentTime = Math.max(0, v.duration - 0.25);
+    };
+    document.getElementById('btn-next').onclick = () => {
+      postMessage({ source: 'x-autonext', cmd: 'next' }, '*');
+    };
+    document.getElementById('btn-probe').onclick = () => {
+      postMessage({ source: 'x-autonext', cmd: 'probe' }, '*');
+    };
+  </script>
+</body>
+</html>
