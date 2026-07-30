@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View (Tor)
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     1.13.1
+// @version     1.14.0
 // @description Tor-safe impersonal restyle: no external fonts/images, offline SVG placeholders, onion-friendly. Use Violentmonkey in Tor Browser.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -536,115 +536,6 @@
             '  left: auto !important;',
             '  transform: none !important;',
             '}',
-            'body .impersonal-bin-filter,',
-            'body .impersonal-table-filters {',
-            '  display: grid !important;',
-            '  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;',
-            '  align-items: start !important;',
-            '  gap: 6px 8px !important;',
-            '  width: 100% !important;',
-            '  max-width: 100% !important;',
-            '  margin: 0 0 8px !important;',
-            '  padding: 8px !important;',
-            '  border: 1px solid #bdb7ae !important;',
-            '  border-radius: 8px !important;',
-            '  background: #ebe7e1 !important;',
-            '  color: var(--text) !important;',
-            '  font-size: 12px !important;',
-            '  font-weight: 700 !important;',
-            '  box-sizing: border-box !important;',
-            '}',
-            '@media (max-width: 900px) {',
-            '  body .impersonal-table-filters {',
-            '    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;',
-            '  }',
-            '}',
-            '@media (max-width: 560px) {',
-            '  body .impersonal-table-filters {',
-            '    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;',
-            '  }',
-            '}',
-            'body .impersonal-table-filters .imp-filter-group {',
-            '  display: flex !important;',
-            '  flex-direction: column !important;',
-            '  gap: 2px !important;',
-            '  min-width: 0 !important;',
-            '  max-width: none !important;',
-            '  width: 100% !important;',
-            '}',
-            'body .impersonal-table-filters .imp-filter-group[data-filter-key="bin"] {',
-            '  grid-row: span 1 !important;',
-            '}',
-            'body .impersonal-bin-filter label,',
-            'body .impersonal-table-filters label {',
-            '  font-weight: 800 !important;',
-            '  color: var(--text) !important;',
-            '  margin: 0 !important;',
-            '  font-size: 10px !important;',
-            '  text-transform: uppercase !important;',
-            '  letter-spacing: 0.03em !important;',
-            '}',
-            'body .impersonal-table-filters input[type="search"],',
-            'body .impersonal-table-filters input[type="text"],',
-            'body .impersonal-table-filters select {',
-            '  min-width: 0 !important;',
-            '  width: 100% !important;',
-            '  max-width: 100% !important;',
-            '  height: 28px !important;',
-            '  padding: 2px 6px !important;',
-            '  border: 1px solid #a8a297 !important;',
-            '  border-radius: 4px !important;',
-            '  background: #f7f5f1 !important;',
-            '  color: var(--text) !important;',
-            '  font-size: 12px !important;',
-            '  font-weight: 700 !important;',
-            '  box-sizing: border-box !important;',
-            '  line-height: 1.2 !important;',
-            '}',
-            'body .impersonal-table-filters select[multiple] {',
-            '  height: auto !important;',
-            '  min-height: 52px !important;',
-            '  max-height: 64px !important;',
-            '  font-family: var(--font-mono) !important;',
-            '  font-size: 11px !important;',
-            '}',
-            'body .impersonal-table-filters .imp-bin-add-row {',
-            '  display: flex !important;',
-            '  gap: 3px !important;',
-            '  width: 100% !important;',
-            '}',
-            'body .impersonal-table-filters .imp-bin-add-row input {',
-            '  flex: 1 1 auto !important;',
-            '  height: 26px !important;',
-            '}',
-            'body .impersonal-table-filters .imp-bin-add-row button {',
-            '  flex: 0 0 auto !important;',
-            '  align-self: stretch !important;',
-            '  padding: 2px 6px !important;',
-            '  height: 26px !important;',
-            '  font-size: 11px !important;',
-            '}',
-            'body .impersonal-bin-filter button,',
-            'body .impersonal-table-filters button {',
-            '  padding: 4px 8px !important;',
-            '  border: 1px solid #a8a297 !important;',
-            '  border-radius: 4px !important;',
-            '  background: #d8d3cb !important;',
-            '  color: var(--text) !important;',
-            '  font-size: 11px !important;',
-            '  font-weight: 800 !important;',
-            '  cursor: pointer !important;',
-            '  align-self: end !important;',
-            '  white-space: nowrap !important;',
-            '  height: 28px !important;',
-            '}',
-            'body .impersonal-bin-filter .imp-bin-count,',
-            'body .impersonal-table-filters .imp-filter-count {',
-            '  color: var(--text-muted) !important;',
-            '  font-size: 11px !important;',
-            '  font-weight: 700 !important;',
-            '  align-self: center !important;',
-            '}',
             'body .dataTables_filter,',
             'body .dataTables_length,',
             'body .dt-search,',
@@ -749,14 +640,12 @@
             'body tbody tr:hover td { background: #b9ae9e !important; }',
             'body td:nth-child(even) { box-shadow: none !important; }',
             'body caption { caption-side: top !important; text-align: left !important; padding: 4px 6px !important; color: var(--text-muted) !important; font-weight: 700 !important; font-size: 13px !important; }',
-            'body tr[data-impersonal-bin-hidden="1"],',
-            'body tr[data-impersonal-colfilter-hidden="1"],',
             'body tr[data-impersonal-complete-hidden="1"] { display: none !important; }',
-            'body tr[data-impersonal-complete="1"]:not([data-impersonal-bin-hidden="1"]):not([data-impersonal-colfilter-hidden="1"]) td {',
+            'body tr[data-impersonal-complete="1"] td {',
             '  background: #c8ecd0 !important;',
             '  border-color: #7fb88a !important;',
             '}',
-            'body tr[data-impersonal-complete="1"]:not([data-impersonal-bin-hidden="1"]):not([data-impersonal-colfilter-hidden="1"]):hover td {',
+            'body tr[data-impersonal-complete="1"]:hover td {',
             '  background: #b6e3c0 !important;',
             '}',
             'body td .' + NUM_CLASS + ',',
@@ -1378,27 +1267,6 @@
         COUNTRY: true,
     };
 
-    const BIN_HEADER_LABELS = {
-        BIN: true,
-        BINS: true,
-        'CARD BIN': true,
-        CARDBIN: true,
-        IIN: true,
-    };
-
-    const CARD_HEADER_LABELS = {
-        CARD: true,
-        CC: true,
-        PAN: true,
-        NUMBER: true,
-        'CARD NUMBER': true,
-        CARDNUMBER: true,
-        'CC NUMBER': true,
-        CCNUMBER: true,
-        'CREDIT CARD': true,
-        CREDITCARD: true,
-    };
-
     const COMPLETE_CHECK_HEADERS = [
         { key: 'FULLNAME', labels: { FULLNAME: true, 'FULL NAME': true } },
         { key: 'ADDRESS', labels: { ADDRESS: true, ADDR: true } },
@@ -1452,33 +1320,6 @@
             if (labelMap[label] || labelMap[compact]) return i;
         }
         return -1;
-    }
-
-    function extractBinFromText(text) {
-        const digits = String(text || '').replace(/\D/g, '');
-        if (digits.length >= 6) return digits.slice(0, 6);
-        return '';
-    }
-
-    function getRowBin(row, binIdx, cardIdx) {
-        if (binIdx >= 0 && row.cells[binIdx]) {
-            const fromBin = extractBinFromText(row.cells[binIdx].innerText || row.cells[binIdx].textContent || '');
-            if (fromBin) return fromBin;
-        }
-        if (cardIdx >= 0 && row.cells[cardIdx]) {
-            const fromCard = extractBinFromText(row.cells[cardIdx].innerText || row.cells[cardIdx].textContent || '');
-            if (fromCard) return fromCard;
-        }
-        for (let i = 0; i < row.cells.length; i++) {
-            const cell = row.cells[i];
-            if (cell.getAttribute('data-impersonal-col-hidden') === '1') continue;
-            const raw = cell.innerText || cell.textContent || '';
-            const digits = raw.replace(/\D/g, '');
-            if (digits.length >= 13 && digits.length <= 19) {
-                return digits.slice(0, 6);
-            }
-        }
-        return '';
     }
 
     function isHeaderRow(row, table) {
@@ -1664,438 +1505,6 @@
         table.setAttribute(MARK + '-cols', 'done');
     }
 
-    function collectTableBins(table, binIdx, cardIdx) {
-        const bins = {};
-        Array.prototype.forEach.call(table.rows, function (row) {
-            if (isHeaderRow(row, table)) return;
-            const bin = getRowBin(row, binIdx, cardIdx);
-            if (bin) bins[bin] = true;
-            row.setAttribute('data-impersonal-bin', bin || '');
-        });
-        return Object.keys(bins).sort();
-    }
-
-    function parseBinQueries(raw) {
-        return String(raw || '')
-            .split(/[\s,;|/]+/)
-            .map(function (part) {
-                return part.replace(/\D/g, '');
-            })
-            .filter(function (part) {
-                return part.length > 0;
-            });
-    }
-
-    function parseTextQueries(raw) {
-        return String(raw || '')
-            .split(/[\n,;|]+/)
-            .map(function (part) {
-                return part.replace(/\s+/g, ' ').trim().toLowerCase();
-            })
-            .filter(function (part) {
-                return part.length > 0;
-            });
-    }
-
-    function getMultiSelectValues(select) {
-        if (!select) return [];
-        const values = [];
-        Array.prototype.forEach.call(select.selectedOptions || [], function (opt) {
-            const v = String(opt.value || '').trim();
-            if (v) values.push(v);
-        });
-        return values;
-    }
-
-    function cellText(cell) {
-        return String((cell && (cell.innerText || cell.textContent)) || '')
-            .replace(/\u00a0/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
-
-    const BIN_LIST_KEY = 'impersonal-saved-bins-v1';
-
-    const TABLE_FILTER_DEFS = [
-        {
-            key: 'bin',
-            label: 'BIN',
-            labels: BIN_HEADER_LABELS,
-            numeric: true,
-            fallbackCard: true,
-        },
-        {
-            key: 'city',
-            label: 'CITY',
-            labels: { CITY: true, TOWN: true },
-            numeric: false,
-        },
-        {
-            key: 'state',
-            label: 'STATE',
-            labels: { STATE: true, ST: true, PROVINCE: true, REGION: true },
-            numeric: false,
-        },
-        {
-            key: 'zip',
-            label: 'ZIP',
-            labels: { ZIP: true, ZIPCODE: true, 'ZIP CODE': true, POSTAL: true, 'POSTAL CODE': true },
-            numeric: false,
-        },
-        {
-            key: 'bank',
-            label: 'BANK',
-            labels: { BANK: true, 'BANK NAME': true, BANKNAME: true, ISSUER: true },
-            numeric: false,
-        },
-    ];
-
-    function getBinStore() {
-        try {
-            return window.__IMP_BIN_STORE || window.sessionStorage;
-        } catch (err) {
-            return null;
-        }
-    }
-
-    function loadSavedBins() {
-        const store = getBinStore();
-        if (!store) return [];
-        try {
-            const raw = store.getItem(BIN_LIST_KEY);
-            const parsed = raw ? JSON.parse(raw) : [];
-            if (!Array.isArray(parsed)) return [];
-            const out = [];
-            const seen = {};
-            parsed.forEach(function (v) {
-                const bin = String(v || '').replace(/\D/g, '').slice(0, 8);
-                if (bin.length >= 4 && !seen[bin]) {
-                    seen[bin] = true;
-                    out.push(bin);
-                }
-            });
-            return out.sort();
-        } catch (err) {
-            return [];
-        }
-    }
-
-    function saveSavedBins(bins) {
-        const store = getBinStore();
-        if (!store) return;
-        try {
-            store.setItem(BIN_LIST_KEY, JSON.stringify(bins));
-        } catch (err) {
-            // ignore
-        }
-    }
-
-    function upsertSavedBin(bin) {
-        const clean = String(bin || '').replace(/\D/g, '').slice(0, 8);
-        if (clean.length < 4) return null;
-        const list = loadSavedBins();
-        if (list.indexOf(clean) === -1) {
-            list.push(clean);
-            list.sort();
-            saveSavedBins(list);
-        }
-        return clean;
-    }
-
-    function collectColumnValues(table, colIdx, numeric) {
-        const values = {};
-        if (colIdx < 0) return [];
-        Array.prototype.forEach.call(table.rows, function (row) {
-            if (isHeaderRow(row, table) || !row.cells[colIdx]) return;
-            let raw = cellText(row.cells[colIdx]);
-            if (numeric) raw = raw.replace(/\D/g, '').slice(0, 6);
-            if (!raw) return;
-            values[raw] = true;
-        });
-        return Object.keys(values).sort(function (a, b) {
-            return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-        });
-    }
-
-    function rowValueForFilter(row, def, colIdx, cardIdx) {
-        if (def.key === 'bin') {
-            return getRowBin(row, colIdx, cardIdx) || '';
-        }
-        if (colIdx < 0 || !row.cells[colIdx]) return '';
-        return cellText(row.cells[colIdx]);
-    }
-
-    function valueMatchesFilter(rawValue, selected, typed, numeric) {
-        const queries = selected.concat(typed);
-        if (!queries.length) return true;
-        if (!rawValue) return false;
-        const value = numeric
-            ? String(rawValue).replace(/\D/g, '')
-            : String(rawValue).trim().toLowerCase();
-        for (let i = 0; i < queries.length; i++) {
-            let q = queries[i];
-            if (numeric) {
-                q = String(q).replace(/\D/g, '');
-                if (!q) continue;
-                if (value === q || value.indexOf(q) === 0) return true;
-            } else {
-                q = String(q).trim().toLowerCase();
-                if (!q) continue;
-                if (value === q || value.indexOf(q) !== -1) return true;
-            }
-        }
-        return false;
-    }
-
-    function applyColumnFilters(table, filterRoot) {
-        const headerCells = getTableHeaderCells(table);
-        const cardIdx = findColumnIndexByLabels(headerCells, CARD_HEADER_LABELS);
-        const active = [];
-
-        TABLE_FILTER_DEFS.forEach(function (def) {
-            const group = filterRoot && filterRoot.querySelector('[data-filter-key="' + def.key + '"]');
-            if (!group || group.style.display === 'none') return;
-            const colIdx = findColumnIndexByLabels(headerCells, def.labels);
-            let selected = [];
-            let typed = [];
-
-            if (def.key === 'bin') {
-                const select = group.querySelector('select.imp-bin-saved');
-                const addInput = group.querySelector('input.imp-bin-new');
-                selected = getMultiSelectValues(select).map(function (v) {
-                    return v.replace(/\D/g, '');
-                }).filter(Boolean);
-                typed = parseBinQueries(addInput && addInput.value);
-            } else {
-                const input = group.querySelector('input.imp-filter-text');
-                typed = parseTextQueries(input && input.value);
-            }
-
-            if (!selected.length && !typed.length) return;
-
-            active.push({
-                def: def,
-                colIdx: colIdx,
-                cardIdx: def.fallbackCard ? cardIdx : -1,
-                selected: selected,
-                typed: typed,
-            });
-        });
-
-        let visible = 0;
-        let total = 0;
-        Array.prototype.forEach.call(table.rows, function (row) {
-            if (isHeaderRow(row, table)) return;
-            total += 1;
-            let show = true;
-            for (let i = 0; i < active.length; i++) {
-                const a = active[i];
-                const raw = rowValueForFilter(row, a.def, a.colIdx, a.cardIdx);
-                if (!valueMatchesFilter(raw, a.selected, a.typed, a.def.numeric)) {
-                    show = false;
-                    break;
-                }
-            }
-            if (show) {
-                row.removeAttribute('data-impersonal-colfilter-hidden');
-                row.removeAttribute('data-impersonal-bin-hidden');
-                if (row.getAttribute('data-impersonal-complete-hidden') !== '1') visible += 1;
-            } else {
-                row.setAttribute('data-impersonal-colfilter-hidden', '1');
-                row.setAttribute('data-impersonal-bin-hidden', '1');
-            }
-        });
-        return { visible: visible, total: total, activeCount: active.length };
-    }
-
-    function countBodyRows(table) {
-        let n = 0;
-        if (!table || !table.rows) return 0;
-        Array.prototype.forEach.call(table.rows, function (row) {
-            if (!isHeaderRow(row, table)) n += 1;
-        });
-        return n;
-    }
-
-    function purgeExtraFilterBars(keepShell) {
-        Array.prototype.forEach.call(document.querySelectorAll('.impersonal-table-filters, .impersonal-bin-filter'), function (el) {
-            if (keepShell && keepShell.contains(el)) return;
-            el.parentNode && el.parentNode.removeChild(el);
-        });
-        Array.prototype.forEach.call(document.querySelectorAll('.impersonal-table-pager'), function (el) {
-            if (keepShell && keepShell.contains(el)) return;
-            el.parentNode && el.parentNode.removeChild(el);
-        });
-    }
-
-    function rebuildBinSelect(select, selectedMap) {
-        if (!select) return;
-        const bins = loadSavedBins();
-        select.innerHTML = '';
-        bins.forEach(function (bin) {
-            const opt = document.createElement('option');
-            opt.value = bin;
-            opt.textContent = bin;
-            if (selectedMap && selectedMap[bin]) opt.selected = true;
-            select.appendChild(opt);
-        });
-    }
-
-    function ensureTableFilters(shell, table) {
-        // Only one filter bar on the whole page — attached to this shell
-        purgeExtraFilterBars(shell);
-
-        let filter = shell.querySelector('.impersonal-table-filters');
-        if (filter && filter.getAttribute(MARK) !== 'table-filters') {
-            filter.parentNode.removeChild(filter);
-            filter = null;
-        }
-        // Drop legacy duplicates inside shell
-        Array.prototype.forEach.call(shell.querySelectorAll('.impersonal-table-filters, .impersonal-bin-filter'), function (el, idx) {
-            if (idx === 0 && el.classList.contains('impersonal-table-filters') && el.getAttribute(MARK) === 'table-filters') {
-                filter = el;
-            } else if (el !== filter) {
-                el.parentNode && el.parentNode.removeChild(el);
-            }
-        });
-
-        if (!filter) {
-            filter = document.createElement('div');
-            filter.className = 'impersonal-table-filters';
-            filter.setAttribute(MARK, 'table-filters');
-
-            TABLE_FILTER_DEFS.forEach(function (def) {
-                const group = document.createElement('div');
-                group.className = 'imp-filter-group';
-                group.setAttribute('data-filter-key', def.key);
-                if (def.key === 'bin') {
-                    group.innerHTML = [
-                        '<label>BIN</label>',
-                        '<select class="imp-bin-saved" multiple size="3" aria-label="Saved BINs"></select>',
-                        '<div class="imp-bin-add-row">',
-                        '<input class="imp-bin-new" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-label="Add BIN">',
-                        '<button type="button" class="imp-bin-add">Add BIN</button>',
-                        '</div>',
-                    ].join('');
-                } else {
-                    group.innerHTML = [
-                        '<label>' + def.label + '</label>',
-                        '<input class="imp-filter-text" type="search" autocomplete="off" spellcheck="false" aria-label="Filter by ' + def.label + '">',
-                    ].join('');
-                }
-                filter.appendChild(group);
-            });
-
-            const actions = document.createElement('div');
-            actions.className = 'imp-filter-group';
-            actions.innerHTML = '<label>&nbsp;</label><button type="button" class="imp-filter-clear">Clear filters</button><span class="imp-filter-count"></span>';
-            filter.appendChild(actions);
-            shell.insertBefore(filter, shell.firstChild);
-
-            function runFilter() {
-                const stats = applyColumnFilters(table, filter);
-                const countEl = filter.querySelector('.imp-filter-count');
-                if (countEl) countEl.textContent = stats.visible + ' / ' + stats.total + ' rows';
-                if (shell._impRefreshPager) shell._impRefreshPager();
-            }
-
-            filter.addEventListener('change', runFilter);
-            filter.addEventListener('input', runFilter);
-
-            const addBtn = filter.querySelector('.imp-bin-add');
-            const addInput = filter.querySelector('.imp-bin-new');
-            const binSelect = filter.querySelector('select.imp-bin-saved');
-
-            function addBinFromInput(offerSave) {
-                const raw = (addInput && addInput.value) || '';
-                const bins = parseBinQueries(raw);
-                if (!bins.length) return;
-                const selectedMap = {};
-                Array.prototype.forEach.call(binSelect.selectedOptions || [], function (opt) {
-                    selectedMap[opt.value] = true;
-                });
-                bins.forEach(function (bin) {
-                    const existing = loadSavedBins();
-                    const known = existing.indexOf(bin) !== -1;
-                    if (!known && offerSave) {
-                        const ok = window.confirm('Save BIN ' + bin + ' to your list?');
-                        if (ok) upsertSavedBin(bin);
-                        else {
-                            // temporary option for this session only
-                            let found = false;
-                            Array.prototype.forEach.call(binSelect.options, function (opt) {
-                                if (opt.value === bin) found = true;
-                            });
-                            if (!found) {
-                                const opt = document.createElement('option');
-                                opt.value = bin;
-                                opt.textContent = bin + ' (temp)';
-                                opt.selected = true;
-                                binSelect.appendChild(opt);
-                            }
-                            selectedMap[bin] = true;
-                            return;
-                        }
-                    } else if (!known) {
-                        upsertSavedBin(bin);
-                    }
-                    selectedMap[bin] = true;
-                });
-                rebuildBinSelect(binSelect, selectedMap);
-                if (addInput) addInput.value = '';
-                runFilter();
-            }
-
-            if (addBtn) {
-                addBtn.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    addBinFromInput(true);
-                });
-            }
-            if (addInput) {
-                addInput.addEventListener('keydown', function (e) {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addBinFromInput(true);
-                    }
-                });
-            }
-
-            filter.querySelector('.imp-filter-clear').addEventListener('click', function (e) {
-                e.preventDefault();
-                Array.prototype.forEach.call(filter.querySelectorAll('select option'), function (opt) {
-                    opt.selected = false;
-                });
-                Array.prototype.forEach.call(filter.querySelectorAll('input.imp-filter-text, input.imp-bin-new'), function (input) {
-                    input.value = '';
-                });
-                runFilter();
-            });
-
-            filter._impRunFilter = runFilter;
-            rebuildBinSelect(binSelect, {});
-        } else {
-            // ensure bin select reflects saved list without wiping selection
-            const binSelect = filter.querySelector('select.imp-bin-saved');
-            if (binSelect) {
-                const selectedMap = {};
-                Array.prototype.forEach.call(binSelect.selectedOptions || [], function (opt) {
-                    selectedMap[opt.value] = true;
-                });
-                rebuildBinSelect(binSelect, selectedMap);
-            }
-        }
-
-        // Show all filter groups (no auto-hide / no prefilled column options)
-        TABLE_FILTER_DEFS.forEach(function (def) {
-            const group = filter.querySelector('[data-filter-key="' + def.key + '"]');
-            if (group) group.style.display = 'flex';
-        });
-        filter.style.display = 'flex';
-        if (filter._impRunFilter) filter._impRunFilter();
-    }
-
     function stripNativeFilters(root) {
         const scope = (root && root.querySelectorAll ? root : document).body || document;
         if (!scope || !scope.querySelectorAll) return;
@@ -2170,8 +1579,6 @@
             if (isHeaderRow(row, table)) return;
             total += 1;
             if (row.getAttribute('data-impersonal-complete-hidden') === '1') return;
-            if (row.getAttribute('data-impersonal-colfilter-hidden') === '1') return;
-            if (row.getAttribute('data-impersonal-bin-hidden') === '1') return;
             if (row.style && row.style.display === 'none') return;
             visible += 1;
         });
@@ -2379,8 +1786,6 @@
                             if (!node) return;
                             known += 1;
                             if (node.getAttribute('data-impersonal-complete-hidden') === '1') return;
-                            if (node.getAttribute('data-impersonal-colfilter-hidden') === '1') return;
-                            if (node.getAttribute('data-impersonal-bin-hidden') === '1') return;
                             matches += 1;
                         });
                         if (!known) return null;
@@ -2553,12 +1958,6 @@
         hideUnwantedTableColumns(table);
         applyCompleteProfileFilter(table);
         markTypeColumns(table);
-        const shell = table.closest && table.closest('.impersonal-table-shell');
-        if (shell) {
-            const filter = shell.querySelector('.impersonal-table-filters');
-            if (filter && filter._impRunFilter) filter._impRunFilter();
-            else applyColumnFilters(table, filter || document.createElement('div'));
-        }
         tintNumbers(table);
     }
 
@@ -2791,12 +2190,14 @@
 
         candidateTables.sort(function (a, b) { return b.rows - a.rows; });
         const primary = candidateTables[0] || null;
+
+        // Remove leftover filter UIs from older script versions
+        Array.prototype.forEach.call(document.querySelectorAll('.impersonal-table-filters, .impersonal-bin-filter'), function (el) {
+            el.parentNode && el.parentNode.removeChild(el);
+        });
+
         if (primary && primary.rows > 0) {
-            purgeExtraFilterBars(primary.shell);
-            ensureTableFilters(primary.shell, primary.table);
             ensureTablePager(primary.shell, primary.table);
-        } else {
-            purgeExtraFilterBars(null);
         }
 
         stripNativeFilters(scope);
