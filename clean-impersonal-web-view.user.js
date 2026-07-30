@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     3.13.0
+// @version     3.14.0
 // @description Strips branding and restyles pages to a muted generic look; swaps media for a curated stock set so sites still read like ordinary websites.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -21,18 +21,18 @@
     const MARK = 'data-impersonal-media';
     const NUM_CLASS = 'impersonal-num';
     const PANEL_ID = 'impersonal-controls';
-    const STORAGE_KEY = 'impersonal-view-settings-v1';
+    const STORAGE_KEY = 'impersonal-view-settings-v2';
 
-    const BASE_TEXT = '#5c5954';
-    const BASE_MUTED = '#8a8580';
-    const BASE_NUM = '#b45309';
-    const BASE_ACCENT = '#7a8580';
+    const BASE_TEXT = '#1a1816';
+    const BASE_MUTED = '#4a4641';
+    const BASE_NUM = '#9a3412';
+    const BASE_ACCENT = '#3f4a45';
 
     const DEFAULTS = {
         siteBrightness: 100,
-        siteContrast: 100,
-        fontBrightness: 100,
-        fontContrast: 100,
+        siteContrast: 110,
+        fontBrightness: 125,
+        fontContrast: 115,
     };
 
     let settings = loadSettings();
@@ -186,34 +186,56 @@
     }
 
     function deriveFontColors() {
-        // Higher font brightness => darker ink on the light page (easier to read)
-        const inkBrightness = clamp(200 - settings.fontBrightness, 50, 150);
-        TEXT = adjustTone(BASE_TEXT, inkBrightness, settings.fontContrast);
-        NUM = adjustTone(BASE_NUM, inkBrightness, settings.fontContrast);
+        // Higher font brightness => darker ink. Stronger defaults for legibility.
+        const t = (settings.fontBrightness - 50) / 100; // 0..1
+        const contrast = settings.fontContrast / 100;
+        // Interpolate toward near-black as brightness rises
+        const dark = 0x12 + Math.round((1 - t) * 0x4a); // ~18..90
+        let r = dark, g = dark - 2, b = dark - 4;
+        const mid = 128;
+        r = mid + (r - mid) * contrast;
+        g = mid + (g - mid) * contrast;
+        b = mid + (b - mid) * contrast;
+        TEXT = rgbToHex(r, g, b);
+        const mutedBase = Math.min(120, dark + 48);
+        NUM = adjustTone('#9a3412', clamp(70 + t * 40, 50, 130), settings.fontContrast);
         return {
             text: TEXT,
-            muted: adjustTone(BASE_MUTED, inkBrightness, settings.fontContrast),
+            muted: rgbToHex(mutedBase, mutedBase - 2, mutedBase - 4),
             num: NUM,
-            accent: adjustTone(BASE_ACCENT, inkBrightness, settings.fontContrast),
+            accent: adjustTone('#3f4a45', clamp(80 + t * 30, 50, 130), settings.fontContrast),
+        };
+    }
+
+    function deriveSurfaceColors() {
+        // Site brightness/contrast adjust page chrome only — never via body CSS filter
+        // (filters wash out text and the settings panel).
+        return {
+            bg: adjustTone('#e8e5e0', settings.siteBrightness, settings.siteContrast),
+            surface: adjustTone('#f7f5f1', settings.siteBrightness, settings.siteContrast),
+            surfaceMuted: adjustTone('#e2dfd9', settings.siteBrightness, settings.siteContrast),
+            border: adjustTone('#8f877c', clamp(200 - settings.siteBrightness + 50, 70, 140), settings.siteContrast),
         };
     }
 
     function applyVisualSettings() {
         const colors = deriveFontColors();
+        const surfaces = deriveSurfaceColors();
         const root = document.documentElement;
         if (!root) return;
 
-        const inkBrightness = clamp(200 - settings.fontBrightness, 50, 150);
         root.style.setProperty('--text', colors.text, 'important');
         root.style.setProperty('--text-muted', colors.muted, 'important');
         root.style.setProperty('--num', colors.num, 'important');
         root.style.setProperty('--accent', colors.accent, 'important');
-        root.style.setProperty('--accent-hover', adjustTone(BASE_ACCENT, inkBrightness * 0.9, settings.fontContrast), 'important');
+        root.style.setProperty('--accent-hover', colors.accent, 'important');
+        root.style.setProperty('--bg', surfaces.bg, 'important');
+        root.style.setProperty('--surface', surfaces.surface, 'important');
+        root.style.setProperty('--surface-muted', surfaces.surfaceMuted, 'important');
+        root.style.setProperty('--border', surfaces.border, 'important');
 
         if (document.body) {
-            const b = (settings.siteBrightness / 100).toFixed(3);
-            const c = (settings.siteContrast / 100).toFixed(3);
-            document.body.style.setProperty('filter', 'brightness(' + b + ') contrast(' + c + ')', 'important');
+            document.body.style.removeProperty('filter');
         }
     }
 
@@ -238,19 +260,19 @@
         }
 
         const colors = deriveFontColors();
-        const inkBrightness = clamp(200 - settings.fontBrightness, 50, 150);
+        const surfaces = deriveSurfaceColors();
 
         style.textContent = [
             ':root {',
-            '  --bg: #e8e5e0 !important;',
-            '  --surface: #f0eeea !important;',
-            '  --surface-muted: #e2dfd9 !important;',
+            '  --bg: ' + surfaces.bg + ' !important;',
+            '  --surface: ' + surfaces.surface + ' !important;',
+            '  --surface-muted: ' + surfaces.surfaceMuted + ' !important;',
             '  --text: ' + colors.text + ' !important;',
             '  --text-muted: ' + colors.muted + ' !important;',
             '  --num: ' + colors.num + ' !important;',
-            '  --border: #d2cec7 !important;',
+            '  --border: ' + surfaces.border + ' !important;',
             '  --accent: ' + colors.accent + ' !important;',
-            '  --accent-hover: ' + adjustTone(BASE_ACCENT, inkBrightness * 0.9, settings.fontContrast) + ' !important;',
+            '  --accent-hover: ' + colors.accent + ' !important;',
             '  --accent-soft: #d8ddd9 !important;',
             '  --shadow: none !important;',
             '  --radius: 10px !important;',
@@ -266,8 +288,10 @@
             '  background-image: none !important;',
             '  color: var(--text) !important;',
             '  font-family: var(--font) !important;',
+            '  font-weight: 650 !important;',
             '  line-height: 1.55 !important;',
             '  -webkit-font-smoothing: antialiased !important;',
+            '  filter: none !important;',
             '}',
             'body, body *, body *::before, body *::after {',
             '  font-family: inherit !important;',
@@ -794,81 +818,88 @@
             '  bottom: 16px !important;',
             '  z-index: 2147483646 !important;',
             '  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif !important;',
-            '  color: #5c5954 !important;',
+            '  color: #111111 !important;',
+            '  filter: none !important;',
+            '  opacity: 1 !important;',
             '}',
             '#' + PANEL_ID + ' * {',
             '  box-sizing: border-box !important;',
             '  font-family: inherit !important;',
-            '  color: inherit !important;',
             '}',
             '#' + PANEL_ID + ' .imp-toggle {',
             '  display: inline-flex !important;',
             '  align-items: center !important;',
             '  justify-content: center !important;',
-            '  width: 40px !important;',
-            '  height: 40px !important;',
+            '  width: 48px !important;',
+            '  height: 48px !important;',
             '  border-radius: 999px !important;',
-            '  border: 1px solid #d2cec7 !important;',
-            '  background: #f0eeea !important;',
-            '  color: #5c5954 !important;',
+            '  border: 2px solid #111111 !important;',
+            '  background: #ffffff !important;',
+            '  color: #111111 !important;',
             '  cursor: pointer !important;',
-            '  box-shadow: 0 8px 24px rgba(40, 36, 30, 0.12) !important;',
-            '  font-size: 13px !important;',
-            '  font-weight: 600 !important;',
+            '  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22) !important;',
+            '  font-size: 16px !important;',
+            '  font-weight: 800 !important;',
             '}',
             '#' + PANEL_ID + ' .imp-panel {',
             '  display: none !important;',
-            '  width: 240px !important;',
+            '  width: 280px !important;',
             '  margin-bottom: 10px !important;',
-            '  padding: 14px !important;',
+            '  padding: 16px !important;',
             '  border-radius: 12px !important;',
-            '  border: 1px solid #d2cec7 !important;',
-            '  background: #f0eeea !important;',
-            '  box-shadow: 0 12px 32px rgba(40, 36, 30, 0.14) !important;',
+            '  border: 2px solid #111111 !important;',
+            '  background: #ffffff !important;',
+            '  color: #111111 !important;',
+            '  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28) !important;',
             '}',
             '#' + PANEL_ID + '.imp-open .imp-panel { display: block !important; }',
             '#' + PANEL_ID + ' .imp-title {',
-            '  font-size: 12px !important;',
-            '  font-weight: 650 !important;',
+            '  font-size: 14px !important;',
+            '  font-weight: 800 !important;',
             '  letter-spacing: 0.04em !important;',
             '  text-transform: uppercase !important;',
-            '  color: #8a8580 !important;',
-            '  margin: 0 0 12px !important;',
+            '  color: #111111 !important;',
+            '  margin: 0 0 14px !important;',
             '}',
             '#' + PANEL_ID + ' .imp-row {',
             '  display: grid !important;',
             '  grid-template-columns: 1fr auto !important;',
             '  gap: 4px 8px !important;',
             '  align-items: center !important;',
-            '  margin: 0 0 10px !important;',
+            '  margin: 0 0 12px !important;',
             '}',
             '#' + PANEL_ID + ' .imp-row label {',
-            '  font-size: 12px !important;',
-            '  color: #5c5954 !important;',
+            '  font-size: 14px !important;',
+            '  font-weight: 700 !important;',
+            '  color: #111111 !important;',
             '}',
             '#' + PANEL_ID + ' .imp-row output {',
-            '  font-size: 11px !important;',
-            '  color: #8a8580 !important;',
+            '  font-size: 13px !important;',
+            '  font-weight: 800 !important;',
+            '  color: #111111 !important;',
             '  font-variant-numeric: tabular-nums !important;',
             '}',
             '#' + PANEL_ID + ' .imp-row input[type="range"] {',
             '  grid-column: 1 / -1 !important;',
             '  width: 100% !important;',
+            '  height: 28px !important;',
             '  margin: 0 !important;',
-            '  accent-color: #7a8580 !important;',
+            '  accent-color: #111111 !important;',
             '}',
             '#' + PANEL_ID + ' .imp-actions {',
             '  display: flex !important;',
             '  justify-content: flex-end !important;',
-            '  margin-top: 4px !important;',
+            '  gap: 8px !important;',
+            '  margin-top: 6px !important;',
             '}',
             '#' + PANEL_ID + ' .imp-reset {',
-            '  border: 1px solid #d2cec7 !important;',
-            '  background: #e2dfd9 !important;',
-            '  color: #5c5954 !important;',
+            '  border: 2px solid #111111 !important;',
+            '  background: #111111 !important;',
+            '  color: #ffffff !important;',
             '  border-radius: 6px !important;',
-            '  padding: 6px 10px !important;',
-            '  font-size: 12px !important;',
+            '  padding: 8px 12px !important;',
+            '  font-size: 13px !important;',
+            '  font-weight: 800 !important;',
             '  cursor: pointer !important;',
             '}',
         ].join('\n');
@@ -923,6 +954,7 @@
             if (out) out.textContent = String(settings[key]);
             saveSettings();
             applyVisualSettings();
+            injectStyles();
             blankInlineBrandStyles(document);
         });
 
@@ -933,6 +965,7 @@
             saveSettings();
             syncPanelInputs(root);
             applyVisualSettings();
+            injectStyles();
             blankInlineBrandStyles(document);
         });
 
