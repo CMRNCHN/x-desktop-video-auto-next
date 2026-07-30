@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View (Tor)
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     1.12.0
+// @version     1.13.0
 // @description Tor-safe impersonal restyle: no external fonts/images, offline SVG placeholders, onion-friendly. Use Violentmonkey in Tor Browser.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -1998,12 +1998,6 @@
                 const countEl = filter.querySelector('.imp-filter-count');
                 if (countEl) countEl.textContent = stats.visible + ' / ' + stats.total + ' rows';
                 if (shell._impRefreshPager) shell._impRefreshPager();
-                if (stats.activeCount > 0 && stats.visible === 0) {
-                    clearTimeout(shell._impSkipTimer);
-                    shell._impSkipTimer = setTimeout(function () {
-                        skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'filter');
-                    }, 400);
-                }
             }
 
             filter.addEventListener('change', runFilter);
@@ -2167,9 +2161,7 @@
     }
 
 
-    const PAGER_SKIP_KEY = 'impersonal-pager-skip-v1';
     const PAGER_PREVIEW_COUNT = 5;
-    const PAGER_MAX_SKIPS = 40;
 
     function countVisibleTableRows(table) {
         let visible = 0;
@@ -2326,23 +2318,6 @@
         }
     }
 
-    function readSkipState() {
-        try {
-            const raw = sessionStorage.getItem(PAGER_SKIP_KEY);
-            return raw ? JSON.parse(raw) : null;
-        } catch (err) {
-            return null;
-        }
-    }
-
-    function writeSkipState(state) {
-        try {
-            if (!state) sessionStorage.removeItem(PAGER_SKIP_KEY);
-            else sessionStorage.setItem(PAGER_SKIP_KEY, JSON.stringify(state));
-        } catch (err) {
-            // ignore
-        }
-    }
 
     function createPagerDriver(table) {
         const api = getDataTableApi(table);
@@ -2587,101 +2562,12 @@
         tintNumbers(table);
     }
 
-    function hasActiveColumnFilters(shell) {
-        const filter = shell && shell.querySelector && shell.querySelector('.impersonal-table-filters');
-        if (!filter) return false;
-        const binSel = filter.querySelector('select.imp-bin-saved');
-        if (binSel && binSel.selectedOptions && binSel.selectedOptions.length) return true;
-        const binNew = filter.querySelector('input.imp-bin-new');
-        if (binNew && String(binNew.value || '').replace(/\D/g, '').length >= 4) return true;
-        const inputs = filter.querySelectorAll('input.imp-filter-text');
-        for (let i = 0; i < inputs.length; i++) {
-            if (String(inputs[i].value || '').trim()) return true;
-        }
-        return false;
-    }
-
-    function pageFingerprint(table, driver) {
-        const info = driver && driver.getInfo ? driver.getInfo() : { page: 0 };
-        const href = String(window.location.href || '');
-        const body = table && table.tBodies && table.tBodies[0] ? table.tBodies[0].innerText : (table && table.innerText) || '';
-        return info.page + '|' + href + '|' + String(body).replace(/\s+/g, ' ').slice(0, 240);
-    }
-
     function navigateToPageNumber(page1) {
         const target = Math.max(1, page1 | 0);
         const href = buildUrlPageHref(target);
         if (!href || href === window.location.href) return false;
-        writeSkipState({ hops: (readSkipState() && readSkipState().hops) || 0, reason: 'nav', target: target });
         window.location.assign(href);
         return true;
-    }
-
-    async function skipEmptyFilteredPages(shell, table, driver, reason) {
-        if (!shell || !driver || shell._impPagerSkipping) return;
-        // Only skip when the user has BIN/city/etc filters active — not for completeness-only empties
-        if (!hasActiveColumnFilters(shell) && reason !== 'continue') {
-            writeSkipState(null);
-            return;
-        }
-        const stats = countVisibleTableRows(table);
-        if (stats.visible > 0) {
-            writeSkipState(null);
-            return;
-        }
-        if (stats.total === 0) return;
-
-        shell._impPagerSkipping = true;
-        const note = shell.querySelector('.imp-pager-note');
-        let hops = 0;
-        const skipState = readSkipState() || { hops: 0, reason: reason || 'empty' };
-        try {
-            while (hops < PAGER_MAX_SKIPS) {
-                let d = createPagerDriver(table);
-                const info = d.getInfo();
-                if (!info.unknown && info.page >= info.pages) break;
-                hops += 1;
-                skipState.hops = (skipState.hops || 0) + 1;
-                writeSkipState(skipState);
-                if (note) note.textContent = 'No filter matches — going to page ' + (info.page + 1) + '…';
-
-                const before = pageFingerprint(table, d);
-                // Prefer hard URL navigation so we never "skip in place" by clicking our own UI
-                const movedUrl = navigateToPageNumber(info.page + 1);
-                if (movedUrl) break;
-
-                const moved = d.goNext();
-                if (!moved) {
-                    if (note) note.textContent = 'Could not advance to the next page.';
-                    writeSkipState(null);
-                    break;
-                }
-                if (d.kind === 'url') break;
-
-                await waitForPageSettle(table, 1100);
-                refreshTableAfterPageChange(table);
-                d = createPagerDriver(table);
-                const after = pageFingerprint(table, d);
-                if (after === before) {
-                    // Click did nothing — force URL bump once, then stop if that also fails
-                    if (!navigateToPageNumber(info.page + 1)) {
-                        if (note) note.textContent = 'Next page control did not change the table.';
-                        writeSkipState(null);
-                    }
-                    break;
-                }
-
-                const nextStats = countVisibleTableRows(table);
-                if (nextStats.visible > 0) {
-                    writeSkipState(null);
-                    if (note) note.textContent = 'Skipped ' + hops + ' empty page' + (hops === 1 ? '' : 's') + '.';
-                    break;
-                }
-            }
-        } finally {
-            shell._impPagerSkipping = false;
-            if (shell._impRefreshPager) shell._impRefreshPager();
-        }
     }
 
     function ensureTablePager(shell, table) {
@@ -2715,69 +2601,49 @@
             ].join('');
             shell.appendChild(pager);
 
-            async function goAndMaybeSkip(action, mode) {
+            async function goPageAction(action, mode) {
                 const d = createPagerDriver(table);
-                const before = pageFingerprint(table, d);
                 const info = d.getInfo();
+                const note = pager.querySelector('.imp-pager-note');
 
-                // Prefer URL page changes for Next / Jump — most reliable across sites
                 if (mode === 'next') {
                     if (navigateToPageNumber(info.page + 1)) return;
                 } else if (mode === 'last') {
                     const target = info.unknown ? info.page + 20 : info.pages;
                     if (navigateToPageNumber(target)) return;
-                } else if (mode === 'jump') {
-                    // action handles jump via goPage; still try URL if click fails
                 }
 
-                let ok = action(d);
+                const ok = action(d);
                 if (!ok && mode === 'jump') {
                     const input = pager.querySelector('.imp-pager-jump-input');
                     const page = parseInt(input && input.value, 10);
                     if (page && navigateToPageNumber(page)) return;
                 }
                 if (!ok) {
-                    if (navigateToPageNumber(info.page + 1)) return;
-                    const note = pager.querySelector('.imp-pager-note');
+                    if (mode !== 'jump' && navigateToPageNumber(info.page + 1)) return;
                     if (note) note.textContent = 'Could not change page.';
                     return;
                 }
                 if (d.kind === 'url') return;
-
-                await waitForPageSettle(table, 1100);
+                await waitForPageSettle(table, 900);
                 refreshTableAfterPageChange(table);
-                const after = pageFingerprint(table, createPagerDriver(table));
-                if (after === before) {
-                    // Click was a no-op (often our own control) — force URL navigation
-                    if (mode === 'jump') {
-                        const input = pager.querySelector('.imp-pager-jump-input');
-                        const page = parseInt(input && input.value, 10);
-                        if (page) navigateToPageNumber(page);
-                    } else {
-                        navigateToPageNumber(info.page + (mode === 'last' ? 20 : 1));
-                    }
-                    return;
-                }
-                if (hasActiveColumnFilters(shell)) {
-                    await skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'nav');
-                }
                 if (shell._impRefreshPager) shell._impRefreshPager();
             }
 
             pager.querySelector('.imp-pager-next').addEventListener('click', function (e) {
                 e.preventDefault();
-                goAndMaybeSkip(function (d) { return d.goNext(); }, 'next');
+                goPageAction(function (d) { return d.goNext(); }, 'next');
             });
             pager.querySelector('.imp-pager-last').addEventListener('click', function (e) {
                 e.preventDefault();
-                goAndMaybeSkip(function (d) { return d.goLast(); }, 'last');
+                goPageAction(function (d) { return d.goLast(); }, 'last');
             });
             pager.querySelector('.imp-pager-jump-go').addEventListener('click', function (e) {
                 e.preventDefault();
                 const input = pager.querySelector('.imp-pager-jump-input');
                 const page = parseInt(input && input.value, 10);
                 if (!page) return;
-                goAndMaybeSkip(function (d) { return d.goPage(page); }, 'jump');
+                goPageAction(function (d) { return d.goPage(page); }, 'jump');
             });
             pager.querySelector('.imp-pager-jump-input').addEventListener('keydown', function (e) {
                 if (e.key === 'Enter') {
@@ -2838,21 +2704,13 @@
                     (async function () {
                         if (navigateToPageNumber(item.page)) return;
                         const drv = createPagerDriver(table);
-                        const before = pageFingerprint(table, drv);
                         if (!drv.goPage(item.page)) {
                             navigateToPageNumber(item.page);
                             return;
                         }
                         if (drv.kind === 'url') return;
-                        await waitForPageSettle(table, 1100);
+                        await waitForPageSettle(table, 900);
                         refreshTableAfterPageChange(table);
-                        if (pageFingerprint(table, createPagerDriver(table)) === before) {
-                            navigateToPageNumber(item.page);
-                            return;
-                        }
-                        if (hasActiveColumnFilters(shell)) {
-                            await skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'preview');
-                        }
                         refreshPager();
                     })();
                 });
@@ -2864,15 +2722,8 @@
         shell._impRefreshPager = refreshPager;
         refreshPager();
 
-        // Only continue an in-progress filter skip after a real navigation — never auto-skip on load
-        const pending = readSkipState();
-        if (pending && hasActiveColumnFilters(shell)) {
-            setTimeout(function () {
-                skipEmptyFilteredPages(shell, table, createPagerDriver(table), 'continue');
-            }, 350);
-        } else if (pending && !hasActiveColumnFilters(shell)) {
-            writeSkipState(null);
-        }
+        // Clear any leftover skipper state from older script versions
+        try { sessionStorage.removeItem('impersonal-pager-skip-v1'); } catch (err) { /* ignore */ }
     }
 
     function fixTables(root) {
