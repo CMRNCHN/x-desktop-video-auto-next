@@ -2697,7 +2697,7 @@
                     btn.title = est + ' visible match' + (est === 1 ? '' : 'es') + ' on page ' + item.page;
                 } else {
                     btn.classList.add('no-matches');
-                    btn.title = 'No matches on page ' + item.page + ' (will skip)';
+                    btn.title = 'Page ' + item.page;
                 }
                 btn.addEventListener('click', function (e) {
                     e.preventDefault();
