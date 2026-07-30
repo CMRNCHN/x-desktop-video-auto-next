@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Clean Impersonal Web View
 // @namespace   https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version     3.15.0
+// @version     3.15.1
 // @description Strips branding and restyles pages to a muted generic look; swaps media for a curated stock set so sites still read like ordinary websites.
 // @author      Senior Engineer
 // @match       http://*/*
@@ -2642,7 +2642,7 @@
                     btn.title = est + ' visible match' + (est === 1 ? '' : 'es') + ' on page ' + item.page;
                 } else {
                     btn.classList.add('no-matches');
-                    btn.title = 'No matches on page ' + item.page + ' (will skip)';
+                    btn.title = 'Page ' + item.page;
                 }
                 btn.addEventListener('click', function (e) {
                     e.preventDefault();
