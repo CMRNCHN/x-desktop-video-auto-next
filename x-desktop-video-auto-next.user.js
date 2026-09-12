@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X Desktop Video Auto Next
 // @namespace    https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version      2.0.2
+// @version      2.0.3
 // @description  On X/Twitter desktop, when a video ends, play the next video instead of looping. Works in Chrome, Firefox, Safari, Edge, Brave, Opera.
 // @author       You
 // @match        https://x.com/*
@@ -15,7 +15,7 @@
 
 /*
  * IMPORTANT: Delete every older copy (v1.x / duplicate installs) in Tampermonkey.
- * You must see exactly one boot line:  [X-AutoNext] boot v2.0.2
+ * You must see exactly one boot line:  [X-AutoNext] boot v2.0.3
  *
  * Firefox page console cannot always call userscript functions (Xray /
  * "Permission denied"). Use postMessage or localStorage instead:
@@ -33,7 +33,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '2.0.2';
+  var VERSION = '2.0.3';
   var DEBUG = true;
 
   // Prevent double-running when multiple copies are installed.
@@ -340,15 +340,23 @@
     }
 
     if (openedViewer) {
-      lastActiveVideo = next;
-      // Pause the old clip only once we have navigated / targeted the next one.
-      if (fromVideo && fromVideo !== next) {
-        clearEndTimer(fromVideo);
-        try { fromVideo.pause(); } catch (e) { /* ignore */ }
-      }
+      // Same bar as viewer Next: href/nav is NOT success until a new clip is playing.
+      var waitMs = Math.max(CFG.viewerNavDelayMs * 5, CFG.advanceCooldownMs, 2000);
+      waitForNewPlaying(fromVideo, srcKey(fromVideo), waitMs, function (ok) {
+        if (ok) {
+          log('advance success (timeline → viewer → new playing)');
+          return;
+        }
+        log('advance fail after viewer href — falling back to in-timeline play');
+        playTimelineVideo(next, fromVideo);
+      });
       return;
     }
 
+    playTimelineVideo(next, fromVideo);
+  }
+
+  function playTimelineVideo(next, fromVideo) {
     var box = containerFor(next);
     try { box.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); }
     catch (e) { box.scrollIntoView(true); }
@@ -382,19 +390,66 @@
     advanceUnlockTimer = window.setTimeout(function () { advancing = false; }, CFG.advanceCooldownMs);
   }
 
-  function isPlayingCandidate(v, fromVideo, fromSrc) {
-    if (!isVideoEl(v) || !v.isConnected || v.paused) return false;
-    if (!(v.currentTime > 0.02 || (!v.paused && v.readyState >= 2))) return false;
-    var sk = srcKey(v);
-    if (fromVideo && v !== fromVideo) return true;
-    if (fromSrc && sk && sk !== fromSrc) return true;
+  function pageKey() {
+    return location.pathname + location.search;
+  }
+
+  function isViewerPlayerVideo(v) {
+    if (!isVideoEl(v) || !v.isConnected) return false;
+    if (v.closest('[role="dialog"], [aria-modal="true"]')) return true;
+    var player = v.closest('[data-testid="videoPlayer"], [data-testid="videoComponent"]');
+    // Timeline clips live under article/cell; immersive viewer usually does not.
+    if (player && !v.closest('article, [data-testid="cellInnerDiv"]')) return true;
     return false;
+  }
+
+  function isActivelyPlaying(v) {
+    if (!isVideoEl(v) || !v.isConnected || v.paused) return false;
+    return v.currentTime > 0.02 || (!v.paused && v.readyState >= 2);
+  }
+
+  // Prefer URL change, new src, or viewer-player advance — NOT "any other <video> playing".
+  // Same-src / leftover timeline players must NOT count.
+  function newClipPlayReason(v, fromVideo, fromSrc, fromUrl) {
+    if (!isActivelyPlaying(v)) return '';
+    if (!isUsableVideo(v) && !isViewerPlayerVideo(v)) return '';
+
+    var sk = srcKey(v);
+    var urlChanged = !!(fromUrl && pageKey() !== fromUrl);
+    var srcChanged = !!(sk && fromSrc && sk !== fromSrc);
+    var sameSrc = !!(sk && fromSrc && sk === fromSrc);
+    var inViewer = isViewerPlayerVideo(v);
+
+    if (sameSrc && !urlChanged) return '';
+    if (fromVideo && v === fromVideo && !srcChanged && !urlChanged) return '';
+
+    if (urlChanged) {
+      if (inViewer) return 'url';
+      if (srcChanged) return 'url';
+      if (sameSrc) return ''; // leftover timeline under a navigated viewer
+      if (fromVideo && v !== fromVideo) return 'url';
+      return '';
+    }
+    if (srcChanged) return 'src';
+    if (inViewer && !sameSrc) return 'viewer';
+    return '';
+  }
+
+  function rejectPlayingReason(v, fromVideo, fromSrc, fromUrl) {
+    if (!isActivelyPlaying(v)) return '';
+    var sk = srcKey(v);
+    var sameSrc = !!(sk && fromSrc && sk === fromSrc);
+    if (sameSrc && !(fromUrl && pageKey() !== fromUrl)) return 'same-src';
+    if (fromVideo && v !== fromVideo && !newClipPlayReason(v, fromVideo, fromSrc, fromUrl)) return 'leftover';
+    return '';
   }
 
   function waitForNewPlaying(fromVideo, fromSrc, timeoutMs, done) {
     var start = Date.now();
+    var fromUrl = pageKey();
     var intervalMs = 120;
     var timer = 0;
+    var lastRejectLogAt = 0;
 
     function finish(ok, v) {
       if (timer) window.clearInterval(timer);
@@ -404,14 +459,22 @@
 
     function poll() {
       var nodes = document.querySelectorAll('video');
+      var rejectKind = '';
       for (var i = 0; i < nodes.length; i++) {
         var v = nodes[i];
-        if (!isUsableVideo(v) && !(v && v.isConnected)) continue;
-        if (!isPlayingCandidate(v, fromVideo, fromSrc)) continue;
+        if (!v || !v.isConnected) continue;
+        var via = newClipPlayReason(v, fromVideo, fromSrc, fromUrl);
+        if (!via) {
+          var why = rejectPlayingReason(v, fromVideo, fromSrc, fromUrl);
+          if (why) rejectKind = why;
+          continue;
+        }
         log('new playing confirmed', {
+          via: via,
           elapsedMs: Date.now() - start,
           src: srcKey(v).slice(0, 48),
-          sameEl: !!(fromVideo && v === fromVideo)
+          sameEl: !!(fromVideo && v === fromVideo),
+          urlChanged: pageKey() !== fromUrl
         });
         if (fromVideo && fromVideo !== v) {
           clearEndTimer(fromVideo);
@@ -421,6 +484,13 @@
         disableLoop(v);
         finish(true, v);
         return;
+      }
+      if (rejectKind && Date.now() - lastRejectLogAt > 800) {
+        lastRejectLogAt = Date.now();
+        log('reject ' + rejectKind + ' — need url|src|viewer', {
+          fromSrc: (fromSrc || '').slice(0, 48),
+          videos: nodes.length
+        });
       }
       if (Date.now() - start >= timeoutMs) {
         log('timeout waiting for new playing', { elapsedMs: Date.now() - start, fromSrc: (fromSrc || '').slice(0, 48) });
