@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X Desktop Video Auto Next
 // @namespace    https://github.com/CMRNCHN/x-desktop-video-auto-next
-// @version      2.0.1
+// @version      2.0.2
 // @description  On X/Twitter desktop, when a video ends, play the next video instead of looping. Works in Chrome, Firefox, Safari, Edge, Brave, Opera.
 // @author       You
 // @match        https://x.com/*
@@ -15,7 +15,7 @@
 
 /*
  * IMPORTANT: Delete every older copy (v1.x / duplicate installs) in Tampermonkey.
- * You must see exactly one boot line:  [X-AutoNext] boot v2.0.1
+ * You must see exactly one boot line:  [X-AutoNext] boot v2.0.2
  *
  * Firefox page console cannot always call userscript functions (Xray /
  * "Permission denied"). Use postMessage or localStorage instead:
@@ -33,7 +33,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '2.0.1';
+  var VERSION = '2.0.2';
   var DEBUG = true;
 
   // Prevent double-running when multiple copies are installed.
@@ -152,14 +152,83 @@
     try { v.loop = false; v.removeAttribute('loop'); } catch (e) { /* ignore */ }
   }
 
-  function findNextVideoButton() {
-    var exact = document.querySelector('[aria-label="Next video"]');
-    if (exact) return exact;
-    var nodes = document.querySelectorAll('[aria-label]');
-    for (var i = 0; i < nodes.length; i++) {
-      if ((nodes[i].getAttribute('aria-label') || '').toLowerCase().indexOf('next video') !== -1) return nodes[i];
+  function isExactNavLabel(label, kind) {
+    var t = String(label || '').trim().toLowerCase();
+    if (kind === 'next') return t === 'next' || t === 'next video';
+    if (kind === 'previous') return t === 'previous' || t === 'previous video';
+    return false;
+  }
+
+  function playerChromeRoots(nearVideo) {
+    var roots = [];
+    var seen = typeof WeakSet === 'function' ? new WeakSet() : null;
+
+    function add(el) {
+      if (!el || (seen && seen.has(el))) return;
+      if (seen) seen.add(el);
+      roots.push(el);
+    }
+
+    if (nearVideo && nearVideo.isConnected) {
+      var box = containerFor(nearVideo);
+      add(box.querySelector('[data-testid="videoPlayer"]'));
+      add(box.querySelector('[data-testid="videoComponent"]'));
+      var p = nearVideo.parentElement;
+      var hops = 0;
+      while (p && p !== document.documentElement && hops < 12) {
+        var tid = p.getAttribute && p.getAttribute('data-testid');
+        if (tid === 'videoPlayer' || tid === 'videoComponent') add(p);
+        p = p.parentElement;
+        hops++;
+      }
+      add(box);
+    }
+
+    var globalPlayers = document.querySelectorAll('[data-testid="videoPlayer"], [data-testid="videoComponent"]');
+    for (var i = 0; i < globalPlayers.length; i++) add(globalPlayers[i]);
+
+    // Immersive / modal viewer chrome (desktop video viewer)
+    var dialogs = document.querySelectorAll('[role="dialog"], [aria-modal="true"]');
+    for (var d = 0; d < dialogs.length; d++) {
+      if (dialogs[d].querySelector('video')) add(dialogs[d]);
+    }
+
+    return roots;
+  }
+
+  function findNavButtonInRoots(roots, kind) {
+    for (var r = 0; r < roots.length; r++) {
+      var root = roots[r];
+      if (!root || !root.querySelectorAll) continue;
+      var nodes = root.querySelectorAll('[aria-label], button, [role="button"]');
+      for (var i = 0; i < nodes.length; i++) {
+        var label = nodes[i].getAttribute('aria-label') || '';
+        if (isExactNavLabel(label, kind)) return nodes[i];
+      }
     }
     return null;
+  }
+
+  function findNextVideoButton(nearVideo) {
+    var roots = playerChromeRoots(nearVideo || lastActiveVideo);
+    var scoped = findNavButtonInRoots(roots, 'next');
+    if (scoped) return scoped;
+
+    // Last resort: exact Next / Next video only, and only if near a video player
+    var nodes = document.querySelectorAll('[aria-label="Next"], [aria-label="Next video"]');
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (el.closest('[data-testid="videoPlayer"], [data-testid="videoComponent"], [role="dialog"], [aria-modal="true"]')) {
+        return el;
+      }
+      if (el.closest('video') || (nearVideo && containerFor(nearVideo).contains(el))) return el;
+    }
+    return null;
+  }
+
+  function findPreviousVideoButton(nearVideo) {
+    var roots = playerChromeRoots(nearVideo || lastActiveVideo);
+    return findNavButtonInRoots(roots, 'previous');
   }
 
   function hardClick(el) {
@@ -183,15 +252,14 @@
     }
   }
 
+  // Optional helper only — live timeline often has 0 `/status/.../video/` anchors.
+  // Do not invent /video/1 URLs; callers must keep scroll/play fallbacks.
   function statusVideoHref(v) {
+    if (!v) return null;
     var box = containerFor(v);
     var direct = box.querySelector('a[href*="/status/"][href*="/video/"]');
-    if (direct) { try { return direct.href; } catch (e) { /* ignore */ } }
-    var anchors = box.querySelectorAll('a[href*="/status/"]');
-    for (var i = 0; i < anchors.length; i++) {
-      var href = anchors[i].getAttribute('href') || '';
-      var m = href.match(/^(\/[^/?#]+\/status\/\d+)/);
-      if (m) return location.origin + m[1] + '/video/1';
+    if (direct) {
+      try { return direct.href; } catch (e) { /* ignore */ }
     }
     return null;
   }
@@ -210,6 +278,22 @@
   }
 
   // ---- Playback ----------------------------------------------------------
+  function findPlayButton(box) {
+    if (!box || !box.querySelectorAll) return null;
+    var exact = box.querySelector('[aria-label="Play"]') || box.querySelector('[aria-label="Play video"]');
+    if (exact) return exact;
+    var nodes = box.querySelectorAll('[aria-label]');
+    for (var i = 0; i < nodes.length; i++) {
+      var label = nodes[i].getAttribute('aria-label') || '';
+      var lower = label.toLowerCase();
+      // Live viewer: "Play Video. … seconds long"
+      if (lower === 'play' || lower === 'play video') return nodes[i];
+      if (lower.indexOf('play video') === 0) return nodes[i];
+      if (/play\s*video/i.test(label)) return nodes[i];
+    }
+    return null;
+  }
+
   function playVideo(v) {
     disableLoop(v);
     if (CFG.muteForAutoplay) {
@@ -218,7 +302,7 @@
     var box = containerFor(v);
     var player = box.querySelector('[data-testid="videoPlayer"]') || box.querySelector('[data-testid="videoComponent"]') || v;
     hardClick(player);
-    var playBtn = box.querySelector('[aria-label="Play"]') || box.querySelector('[aria-label="Play video"]');
+    var playBtn = findPlayButton(box);
     if (playBtn) hardClick(playBtn);
     try {
       var p = v.play();
@@ -248,13 +332,20 @@
   function activateTimelineVideo(next, fromVideo) {
     log('activate', { from: srcKey(fromVideo).slice(0, 48), to: srcKey(next).slice(0, 48) });
 
-    if (fromVideo && fromVideo !== next) {
-      clearEndTimer(fromVideo);
-      try { fromVideo.pause(); } catch (e) { /* ignore */ }
+    // Prefer in-timeline play; viewer hrefs are optional (often absent on live x.com).
+    var openedViewer = false;
+    if (CFG.preferViewer) {
+      var href = statusVideoHref(next);
+      if (href) openedViewer = openInVideoViewer(next);
     }
 
-    if (CFG.preferViewer && openInVideoViewer(next)) {
+    if (openedViewer) {
       lastActiveVideo = next;
+      // Pause the old clip only once we have navigated / targeted the next one.
+      if (fromVideo && fromVideo !== next) {
+        clearEndTimer(fromVideo);
+        try { fromVideo.pause(); } catch (e) { /* ignore */ }
+      }
       return;
     }
 
@@ -262,7 +353,14 @@
     try { box.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); }
     catch (e) { box.scrollIntoView(true); }
 
-    window.setTimeout(function () { playVideo(next); lastActiveVideo = next; }, CFG.playNudgeMs);
+    window.setTimeout(function () {
+      playVideo(next);
+      lastActiveVideo = next;
+      if (fromVideo && fromVideo !== next) {
+        clearEndTimer(fromVideo);
+        try { fromVideo.pause(); } catch (e2) { /* ignore */ }
+      }
+    }, CFG.playNudgeMs);
     window.setTimeout(function () { if (next.isConnected && next.paused) playVideo(next); }, CFG.playRetryMs);
   }
 
@@ -284,6 +382,68 @@
     advanceUnlockTimer = window.setTimeout(function () { advancing = false; }, CFG.advanceCooldownMs);
   }
 
+  function isPlayingCandidate(v, fromVideo, fromSrc) {
+    if (!isVideoEl(v) || !v.isConnected || v.paused) return false;
+    if (!(v.currentTime > 0.02 || (!v.paused && v.readyState >= 2))) return false;
+    var sk = srcKey(v);
+    if (fromVideo && v !== fromVideo) return true;
+    if (fromSrc && sk && sk !== fromSrc) return true;
+    return false;
+  }
+
+  function waitForNewPlaying(fromVideo, fromSrc, timeoutMs, done) {
+    var start = Date.now();
+    var intervalMs = 120;
+    var timer = 0;
+
+    function finish(ok, v) {
+      if (timer) window.clearInterval(timer);
+      timer = 0;
+      done(ok, v || null);
+    }
+
+    function poll() {
+      var nodes = document.querySelectorAll('video');
+      for (var i = 0; i < nodes.length; i++) {
+        var v = nodes[i];
+        if (!isUsableVideo(v) && !(v && v.isConnected)) continue;
+        if (!isPlayingCandidate(v, fromVideo, fromSrc)) continue;
+        log('new playing confirmed', {
+          elapsedMs: Date.now() - start,
+          src: srcKey(v).slice(0, 48),
+          sameEl: !!(fromVideo && v === fromVideo)
+        });
+        if (fromVideo && fromVideo !== v) {
+          clearEndTimer(fromVideo);
+          try { if (!fromVideo.paused) fromVideo.pause(); } catch (e) { /* ignore */ }
+        }
+        lastActiveVideo = v;
+        disableLoop(v);
+        finish(true, v);
+        return;
+      }
+      if (Date.now() - start >= timeoutMs) {
+        log('timeout waiting for new playing', { elapsedMs: Date.now() - start, fromSrc: (fromSrc || '').slice(0, 48) });
+        finish(false, null);
+      }
+    }
+
+    timer = window.setInterval(poll, intervalMs);
+    poll();
+  }
+
+  function fallbackAfterViewer(source) {
+    if (CFG.dispatchArrowDown && /\/status\/\d+/.test(location.pathname)) {
+      try {
+        document.body.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true, cancelable: true, view: window
+        }));
+        log('dispatched ArrowDown');
+      } catch (e) { /* ignore */ }
+    }
+    scrollToNextTimelineVideo(source);
+  }
+
   function goNext(reason, fromVideo) {
     var now = Date.now();
     var source = fromVideo || lastActiveVideo;
@@ -300,22 +460,36 @@
     lastAdvanceFromSrc = key;
     unlockAdvanceSoon();
 
-    var viewerNext = findNextVideoButton();
-    log('goNext', reason, { browser: CFG.browserId, path: location.pathname, hasViewerNext: !!viewerNext, videos: listTimelineVideos().length });
+    var viewerNext = findNextVideoButton(source);
+    log('goNext', reason, {
+      browser: CFG.browserId,
+      path: location.pathname,
+      hasViewerNext: !!viewerNext,
+      nextAria: viewerNext ? (viewerNext.getAttribute('aria-label') || '') : '',
+      videos: listTimelineVideos().length
+    });
 
-    // In the immersive video viewer, X's own Next-video control gives endless play.
-    if (viewerNext && hardClick(viewerNext)) { log('clicked Next video'); return; }
-
-    if (CFG.dispatchArrowDown && /\/status\/\d+/.test(location.pathname)) {
-      try {
-        document.body.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true, cancelable: true, view: window
-        }));
-        log('dispatched ArrowDown');
-      } catch (e) { /* ignore */ }
+    // Immersive viewer Next: click is NOT success until a new clip is actually playing.
+    if (viewerNext) {
+      var clicked = hardClick(viewerNext);
+      log(clicked ? 'clicked Next' : 'Next click failed', {
+        aria: viewerNext.getAttribute('aria-label') || ''
+      });
+      if (clicked) {
+        var waitMs = Math.max(CFG.viewerNavDelayMs * 5, CFG.advanceCooldownMs, 2000);
+        waitForNewPlaying(source, key, waitMs, function (ok) {
+          if (ok) {
+            log('advance success (viewer Next → new playing)');
+            return;
+          }
+          log('advance fail after Next click — falling back to timeline');
+          fallbackAfterViewer(source);
+        });
+        return;
+      }
     }
 
-    scrollToNextTimelineVideo(source);
+    fallbackAfterViewer(source);
   }
 
   // ---- End detection -----------------------------------------------------
@@ -333,7 +507,8 @@
       var left = v.duration - v.currentTime;
       if (left > 0.55) { armEndTimer(v); return; }
       log('end-guard', { left: left, duration: v.duration });
-      try { v.pause(); } catch (e) { /* ignore */ }
+      // Do not permanently stop the old clip until goNext confirms a new one is playing.
+      disableLoop(v);
       goNext('end-guard', v);
     }, remainingMs));
   }
@@ -377,7 +552,7 @@
         nearEnd = false;
         if (v !== lastActiveVideo && visibilityScore(v) < 0.5) return;
         log('loop-restart');
-        try { v.pause(); } catch (e) { /* ignore */ }
+        disableLoop(v);
         goNext('loop-restart', v);
         return;
       }
